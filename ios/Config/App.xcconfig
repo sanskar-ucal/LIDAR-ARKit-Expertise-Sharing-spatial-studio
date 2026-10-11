@@ -1,0 +1,7 @@
+// Shared build settings. Personal signing values live in Signing.xcconfig (git-ignored);
+// copy Signing.xcconfig.example to Signing.xcconfig and fill it in.
+PRODUCT_BUNDLE_IDENTIFIER = edu.cpsc581.roombridge.app
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+#include? "Signing.xcconfig"

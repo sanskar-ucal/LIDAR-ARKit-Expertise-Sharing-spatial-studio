@@ -1,0 +1,264 @@
+# RoomBridge protocol v1
+
+`protocolVersion = 1`. Coordinates follow [COORDINATES.md](COORDINATES.md).
+Shared fixtures: [`fixtures/messages.json`](fixtures/messages.json),
+[`fixtures/coordinates.json`](fixtures/coordinates.json). The JSON Schema in
+[`schema/roombridge.schema.json`](schema/roombridge.schema.json) documents the
+envelope and object shapes. The authoritative validators are
+`server/src/protocol.ts` (zod), `blender_addon/roombridge/protocol.py` and
+`ios/RoomBridgeCore/Sources/RoomBridgeCore/Protocol.swift`.
+
+## Transports
+
+| Channel | Purpose | Limits |
+| --- | --- | --- |
+| `POST /api/rooms` | create a room | 10 per IP per 10 min |
+| `WS /ws/control` | JSON text messages: auth, scene, comments, guidance, presence | 64 KiB per message, 40 msg/s sustained (burst 80) per connection |
+| `WS /ws/preview` | binary JPEG preview frames (host -> server -> viewers) | 512 KiB per frame, max 15 frames/s accepted from host |
+| `POST/PUT/GET /api/rooms/:roomId/scan...` | chunked room-scan upload/download | 256 KiB per chunk, 64 chunks, 8 MiB total |
+
+Control and preview traffic use **separate sockets**. A slow viewer only ever has
+at most one preview frame in flight; newer frames replace older ones and stale
+frames are dropped, so the control socket is never stuck behind video.
+
+## Rooms and credentials
+
+`POST /api/rooms` body `{ "hostName": "Sanskar" }` returns:
+
+```json
+{
+  "roomId": "r_Q0x...", "code": "K7M3QX",
+  "hostToken": "...", "expertToken": "...", "viewerToken": "...",
+  "viewerLink": "http://10.0.0.61:8787/r/K7M3QX#t=<viewerToken>",
+  "expertLink": "http://10.0.0.61:8787/r/K7M3QX#t=<expertToken>",
+  "expiresAt": 1760000000000
+}
+```
+
+* Tokens are 144-bit random values. The **role is derived from which token is
+  presented**, never from a client-supplied field.
+* The 6-character code identifies a room but grants nothing by itself.
+* Tokens are placed in the URL **fragment** (`#t=`), which browsers never send
+  to the server, so they do not appear in HTTP logs.
+* Capacity: 1 host connection (a new host connection replaces the old one),
+  2 expert connections (Blender + optional browser companion), 8 viewers.
+* Rooms expire after 30 minutes with nobody connected, after 12 hours in total,
+  or immediately when the host ends them. Scans and frames are kept only in
+  memory and are deleted with the room.
+
+## Envelope
+
+Every control message (both directions) is a JSON object:
+
+```json
+{
+  "protocolVersion": 1,
+  "type": "object.update",
+  "roomId": "r_Q0x...",
+  "clientId": "c_abc...",
+  "messageId": "m-7f3e...",
+  "sceneRevision": 12,
+  "originEpoch": 1,
+  "payload": { }
+}
+```
+
+* `messageId`: unique per sender (UUID recommended), 1 to 64 characters. The
+  server keeps a bounded LRU of the last 1000 `(clientId, messageId)` pairs per
+  room. A repeated message gets `ack` with `duplicate: true` and has **no
+  effect**, so retries never duplicate objects or comments.
+* `roomId` / `clientId`: empty string in `auth` (not known yet). After
+  `auth.ok` they must match the values assigned by the server.
+* `sceneRevision`: on server messages, the room's scene revision after the
+  change. Clients may omit it.
+* `originEpoch`: **required** on messages that carry geometry (`object.create`,
+  `object.update`, `guidance.set`, `guidance.begin`, `guidance.attempt`). If it is
+  not the room's current epoch, the server replies `error` `stale_epoch`.
+* Every client message except `ping` is answered with either
+  `ack { ackOf }` or `error { ackOf, code, message }`.
+
+## Ordering and ownership
+
+* The server is authoritative. It holds a monotonic `sceneRevision` per room,
+  bumped on each scene change (objects, guidance lifecycle, scan, epoch), and a
+  per-object `revision`. Client clocks are never used for ordering; timestamps
+  in payloads are informational and server-assigned.
+* `object.update` must carry `baseRevision` equal to the object's current
+  revision, otherwise it fails with `stale_revision`, and the error payload
+  includes the current object. Blender therefore keeps at most one update in
+  flight per object and coalesces newer edits into the next one.
+* **Design objects belong to the expert.** Viewers can never change the scene.
+  The host never edits a design object directly. During guidance, the host
+  controls only a separate **attempt**, which is a signed scalar offset along
+  the guidance axis. The server computes the attempt position. Approval is
+  applied by the server, which writes the attempt pose into the object and
+  bumps its revision. Cancel or reset discard the attempt. The expert and the
+  novice never write to the same field, so there is no tug-of-war.
+
+| Message | host | expert | viewer |
+| --- | :-: | :-: | :-: |
+| `object.create` / `object.update` / `object.delete` | | yes | |
+| `guidance.set` / `guidance.begin` / `guidance.approve` / `guidance.cancel` | | yes | |
+| `guidance.reset` | yes | yes | |
+| `guidance.attempt` | yes | | |
+| `preview.status`, `origin.reset`, `room.end` | yes | | |
+| `selection`, `comment.add`, `reaction.toggle`, `scene.request`, `room.leave`, `ping` | yes | yes | yes |
+
+Forbidden messages get `error` `forbidden`.
+
+## Client -> server messages
+
+| type | payload |
+| --- | --- |
+| `auth` | `{ roomCode, token, displayName (1-40), clientKind: "ios"\|"blender"\|"web"\|"test", resumeClientId? }` |
+| `ping` | `{}` -> `pong` |
+| `scene.request` | `{}` -> `scene.snapshot` |
+| `room.leave` | `{}` |
+| `room.end` | `{}` (host) |
+| `origin.reset` | `{ reason? }` (host). Bumps epoch, discards scan and guidance, marks objects stale, then broadcasts a snapshot. |
+| `object.create` | `{ object: ObjectInput }` |
+| `object.update` | `{ id, baseRevision, patch: Partial<ObjectInput without id/kind> }` |
+| `object.delete` | `{ id }` |
+| `selection` | `{ objectId: string \| null }` |
+| `comment.add` | `{ objectId: string \| null, text (1-500) }` (5 per 10 s per client) |
+| `reaction.toggle` | `{ objectId, kind: "like" \| "discuss" }` |
+| `guidance.set` | `{ objectId, axis: "x"\|"y"\|"z", targetPosition: Vec3, tolerance? (0.01-0.5, default 0.05) }` |
+| `guidance.begin` | `{ guidanceId }` |
+| `guidance.attempt` | `{ guidanceId, offset (meters, \|offset\| <= 10), seq (int, increasing), holding: bool }` |
+| `guidance.approve` | `{ guidanceId }` |
+| `guidance.reset` | `{ guidanceId }` |
+| `guidance.cancel` | `{ guidanceId }` |
+| `preview.status` | `{ state: "live" \| "paused", targetFps, width }` (host) |
+
+`ObjectInput = { id (UUID), kind: "pillar"|"partition"|"panel", name (1-60), position: Vec3, rotation: Quat [x,y,z,w], dimensions: Vec3, color: "#RRGGBB", textureRef: null | "sample:picture" }`
+
+## Server -> client messages
+
+| type | payload |
+| --- | --- |
+| `auth.ok` | `{ clientId, role, roomId, code, hostName, previewTicket, limits }` (always followed by `scene.snapshot`) |
+| `auth.error` | `{ code, message }`, after which the socket is closed |
+| `scene.snapshot` | `{ room, participants, objects, guidance, comments (last 100), reactions, scan, preview }` |
+| `presence` | `{ participants }` |
+| `object.created` / `object.updated` | `{ object: SceneObject }` |
+| `object.deleted` | `{ id }` (comments keep `objectDeleted: true`) |
+| `comment.added` | `{ comment }` |
+| `reaction.updated` | `{ objectId, like: clientId[], discuss: clientId[] }` |
+| `guidance.state` | `{ guidance: Guidance \| null }` |
+| `scan.ready` | `{ scan: ScanMeta }` |
+| `preview.status` | `{ state: "live"\|"paused"\|"offline", hostConnected, viewers, targetFps, width }` |
+| `room.ended` | `{ reason }`, after which sockets are closed |
+| `ack` | `{ ackOf, duplicate? }` |
+| `error` | `{ ackOf?, code, message, current? }` |
+| `pong` | `{}` |
+
+`SceneObject = ObjectInput + { revision, originEpoch, stale (originEpoch < room epoch), owner: "expert", createdBy, updatedAt }`
+
+`Guidance = { id, objectId, state: "preview"|"active"|"approved", axis, tolerance, start: {position, rotation}, target: {position, rotation}, attempt: null | {offset, position, distance, withinTolerance, holding, seq, updatedAt}, originEpoch }`
+
+The guidance lifecycle maps onto the start/update/finish/reset operations
+like this:
+
+* `guidance.set` creates or replaces the ghost target. The state is `preview`,
+  in which the expert can still demonstrate.
+* `guidance.begin` captures the object's current pose as `start` and moves to
+  the `active` state. The target must lie on the line `start + axis * t`, within
+  1 cm, otherwise the server replies `target_off_axis`.
+* `guidance.attempt` updates the attempt. The phone sends at most 15 per second,
+  plus a final `holding:false` on release.
+* `guidance.approve` copies the attempt position into the object, which then
+  broadcasts as `object.updated`. The guidance moves to `approved`.
+* `guidance.reset` sets the attempt back to offset 0 and the state back to
+  `active`.
+* `guidance.cancel` removes the guidance. Deleting the object cancels it too.
+
+Error codes: `bad_request`, `unsupported_protocol`, `unauthorized`, `forbidden`,
+`not_found`, `room_full`, `rate_limited`, `stale_revision`, `stale_epoch`,
+`duplicate_object`, `invalid_dimensions`, `target_off_axis`, `invalid_state`,
+`too_large`, `room_ended`.
+
+## Reconnect and late join
+
+1. The client reconnects with backoff (0.5 s doubling to 8 s) and sends `auth`
+   with `resumeClientId`.
+2. The server reuses the identity when the earlier client had the same role
+   and disconnected less than 60 s ago.
+3. The server always sends a fresh `scene.snapshot` immediately after
+   `auth.ok`. Clients **replace** their state with it and only then resume
+   applying incremental messages.
+4. If a client sees `sceneRevision` jump by more than one, it sends
+   `scene.request`.
+5. Late joiners get the current scene, the active guidance, the last 100
+   comments and, through the preview socket, the latest frame if it is less
+   than 3 s old.
+
+## Preview socket
+
+1. Connect `WS /ws/preview`.
+2. The first message must be text:
+   `{"type":"preview.auth","ticket":"<previewTicket from auth.ok>"}`. The server
+   replies `{"type":"preview.ready","role":"host"|"viewer"}`.
+3. The host sends binary frames. Viewers and experts receive them.
+4. The server sends the host `{"type":"preview.stats","viewers":n,"dropped":n}`
+   about every 2 s.
+
+Binary frame = 24-byte little-endian header followed by a JPEG:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 4 | magic `RBPF` (0x52 0x42 0x50 0x46) |
+| 4 | 1 | version = 1 |
+| 5 | 1 | orientation of the captured interface: 0 portrait, 1 portraitUpsideDown, 2 landscapeLeft, 3 landscapeRight. The JPEG is already upright as displayed. |
+| 6 | 2 | flags: bit0 = synthetic sample room, bit1 = tracking limited |
+| 8 | 4 | sequence number (uint32, increasing) |
+| 12 | 2 | width in pixels |
+| 14 | 2 | height in pixels |
+| 16 | 8 | host capture time (float64 ms, informational only) |
+| 24 | ... | JPEG bytes (must start with FF D8) |
+
+The server enforces these rules on frames:
+
+* It drops frames while the host has preview `paused`. It also clears the
+  latest frame on pause, so nothing stale is shown to late joiners.
+* It drops frames that are malformed, oversized, arrive faster than 15 frames
+  per second, or carry a sequence number at or below the last one accepted.
+* It forwards a frame to a viewer only if that viewer has no frame still in
+  flight and its `bufferedAmount` is under 256 KiB. Otherwise the frame is
+  dropped for that viewer, and the latest frame is sent when the viewer
+  drains.
+
+## Scan upload
+
+The host is authenticated with `Authorization: Bearer <hostToken>`.
+
+1. `POST /api/rooms/:roomId/scan/begin` with
+   `{ originEpoch, chunkCount, totalBytes, vertexCount, triangleCount, synthetic }`.
+   The response is `{ uploadId }`. Starting a new upload replaces any previous
+   staging upload.
+2. `PUT /api/rooms/:roomId/scan/:uploadId/chunks/:index` with a binary body of
+   at most 256 KiB.
+3. `POST /api/rooms/:roomId/scan/:uploadId/commit`. The server checks that
+   every chunk is present, that the byte total matches, that the header,
+   counts and epoch match, that every vertex is finite and within 50 m, and
+   that every index is in range. Only then does it replace the room scan,
+   bump `sceneRevision` and broadcast `scan.ready`. A partial or invalid upload
+   is never visible. Staging uploads expire after 2 minutes.
+
+The host or expert downloads the result with
+`GET /api/rooms/:roomId/scan` (`Authorization: Bearer <hostToken | expertToken>`).
+Viewers are denied, to keep the home geometry private.
+
+Scan binary (`RBSC`, little-endian):
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 4 | magic `RBSC` |
+| 4 | 2 | version = 1 |
+| 6 | 2 | flags: bit0 = synthetic |
+| 8 | 4 | originEpoch |
+| 12 | 4 | vertexCount (at most 200 000) |
+| 16 | 4 | triangleCount (at most 400 000) |
+| 20 | 12 * vertexCount | float32 x,y,z, canonical world (anchor transforms already applied) |
+| ... | 12 * triangleCount | uint32 i0,i1,i2 (counter-clockwise when seen from the front) |
+
+`ScanMeta = { scanId, originEpoch, vertexCount, triangleCount, bytes, synthetic, committedAt }`

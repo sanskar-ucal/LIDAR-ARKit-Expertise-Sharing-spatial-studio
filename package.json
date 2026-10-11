@@ -1,0 +1,20 @@
+{
+  "name": "roombridge",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RoomBridge: remote CAD expertise sharing between a LiDAR iPhone, Blender and family browsers.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20.17.0"
+  },
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "npm run start -w server",
+    "test": "npm run test -w server && npm run test -w web && python3 -m unittest discover -s blender_addon/tests -t blender_addon",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roombridge.local/protocol/v1/roombridge.schema.json",
+  "title": "RoomBridge protocol v1 (documentation schema)",
+  "description": "Shapes of the control envelope and scene objects. Runtime validation lives in server/src/protocol.ts, blender_addon/roombridge/protocol.py and ios/RoomBridgeCore/Sources/RoomBridgeCore/Protocol.swift; all of them are checked against protocol/fixtures/messages.json.",
+  "$defs": {
+    "vec3": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+    "quat": {
+      "description": "Unit quaternion, component order [x, y, z, w].",
+      "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4
+    },
+    "objectInput": {
+      "type": "object",
+      "required": ["id", "kind", "name", "position", "rotation", "dimensions", "color", "textureRef"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "enum": ["pillar", "partition", "panel"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "position": { "$ref": "#/$defs/vec3" },
+        "rotation": { "$ref": "#/$defs/quat" },
+        "dimensions": { "$ref": "#/$defs/vec3", "description": "Final physical size in meters along local X/Y/Z, each 0.01..20." },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "textureRef": { "enum": [null, "sample:picture"] }
+      }
+    },
+    "sceneObject": {
+      "allOf": [{ "$ref": "#/$defs/objectInput" }],
+      "required": ["revision", "originEpoch", "stale", "owner", "createdBy", "updatedAt"],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "originEpoch": { "type": "integer", "minimum": 1 },
+        "stale": { "type": "boolean" },
+        "owner": { "const": "expert" },
+        "createdBy": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      }
+    }
+  },
+  "type": "object",
+  "required": ["protocolVersion", "type", "roomId", "clientId", "messageId", "payload"],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "type": { "type": "string" },
+    "roomId": { "type": "string", "maxLength": 64 },
+    "clientId": { "type": "string", "maxLength": 64 },
+    "messageId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "sceneRevision": { "type": "integer", "minimum": 0 },
+    "originEpoch": { "type": "integer", "minimum": 1 },
+    "ackOf": { "type": "string" },
+    "payload": { "type": "object" }
+  }
+}

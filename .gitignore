@@ -1,0 +1,26 @@
+node_modules/
+dist/
+*.log
+.env
+.DS_Store
+__pycache__/
+*.pyc
+
+# iOS
+ios/RoomBridge.xcodeproj/
+ios/Config/Signing.xcconfig
+ios/RoomBridgeCore/.build/
+ios/RoomBridgeCore/.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Build artifacts
+build/
+
+# Never commit captured scans or frames
+*.rbsc
+captures/
+
+# Shared binary test fixtures are synthetic and safe to commit
+!protocol/fixtures/sample-room.rbsc

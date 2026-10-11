@@ -1,0 +1,44 @@
+# XcodeGen spec. Generate the Xcode project with:  scripts/gen-ios.sh
+# (requires `brew install xcodegen`). Signing is configured in Config/Signing.xcconfig.
+name: RoomBridge
+options:
+  bundleIdPrefix: edu.cpsc581.roombridge
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+configFiles:
+  Debug: Config/App.xcconfig
+  Release: Config/App.xcconfig
+packages:
+  RoomBridgeCore:
+    path: RoomBridgeCore
+targets:
+  RoomBridge:
+    type: application
+    platform: iOS
+    sources:
+      - path: RoomBridge
+    dependencies:
+      - package: RoomBridgeCore
+        product: RoomBridgeCore
+      - sdk: ARKit.framework
+      - sdk: RealityKit.framework
+    settings:
+      base:
+        INFOPLIST_FILE: Config/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+schemes:
+  RoomBridge:
+    build:
+      targets:
+        RoomBridge: all
+    run:
+      config: Debug
+    archive:
+      config: Release
