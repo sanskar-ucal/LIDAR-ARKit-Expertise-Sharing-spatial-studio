@@ -1,0 +1,16 @@
+schema_version = "1.0.0"
+
+id = "roombridge"
+version = "0.1.0"
+name = "RoomBridge"
+tagline = "Guide a remote novice's AR room edits from Blender"
+maintainer = "CPSC 581 RoomBridge team"
+type = "add-on"
+tags = ["3D View", "Object"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:MIT"]
+
+[permissions]
+network = "Connect to a RoomBridge room server chosen by the user"

@@ -1,0 +1,5 @@
+// Copy to ios/Config/Signing.xcconfig (ignored by git) and set your own values.
+// Find your Team ID in Xcode > Settings > Accounts, or developer.apple.com > Membership.
+DEVELOPMENT_TEAM = ABCDE12345
+// Must be unique to you when using a free/personal team.
+PRODUCT_BUNDLE_IDENTIFIER = com.yourname.roombridge

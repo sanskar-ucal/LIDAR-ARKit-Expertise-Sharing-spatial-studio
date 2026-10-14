@@ -1,0 +1,447 @@
+{
+  "description": "Shared protocol fixtures. 'validClient' must pass every client-side validator and the server validator; 'invalidClient' must be rejected by the server with the listed error code; 'server' examples must be decodable by every client.",
+  "validClient": [
+    {
+      "name": "auth",
+      "message": {
+        "protocolVersion": 1,
+        "type": "auth",
+        "roomId": "",
+        "clientId": "",
+        "messageId": "m-auth-1",
+        "payload": {
+          "roomCode": "K7M3QX",
+          "token": "tok_example_not_real",
+          "displayName": "Ana",
+          "clientKind": "web"
+        }
+      }
+    },
+    {
+      "name": "object.create pillar",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.create",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-1",
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+            "kind": "pillar",
+            "name": "Pillar 1",
+            "position": [
+              1,
+              0,
+              -1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "dimensions": [
+              0.3,
+              2.5,
+              0.3
+            ],
+            "color": "#c9b79c",
+            "textureRef": null
+          }
+        }
+      }
+    },
+    {
+      "name": "object.create panel with sample picture",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.create",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-2",
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "0b7e5c3a-2d4f-4e8b-a1c2-9f8e7d6c5b4a",
+            "kind": "panel",
+            "name": "Picture",
+            "position": [
+              -1.2,
+              1.4,
+              -0.5
+            ],
+            "rotation": [
+              0,
+              0.70710678,
+              0,
+              0.70710678
+            ],
+            "dimensions": [
+              0.8,
+              0.6,
+              0.03
+            ],
+            "color": "#ffffff",
+            "textureRef": "sample:picture"
+          }
+        }
+      }
+    },
+    {
+      "name": "object.update partial",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.update",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-3",
+        "originEpoch": 1,
+        "payload": {
+          "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+          "baseRevision": 1,
+          "patch": {
+            "position": [
+              1.2,
+              0,
+              -1
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "comment linked to object",
+      "message": {
+        "protocolVersion": 1,
+        "type": "comment.add",
+        "roomId": "r_test",
+        "clientId": "c_viewer",
+        "messageId": "m-4",
+        "payload": {
+          "objectId": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+          "text": "Could this partition be shorter?"
+        }
+      }
+    },
+    {
+      "name": "guidance.set",
+      "message": {
+        "protocolVersion": 1,
+        "type": "guidance.set",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-5",
+        "originEpoch": 1,
+        "payload": {
+          "objectId": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+          "axis": "x",
+          "targetPosition": [
+            1.6,
+            0,
+            -1
+          ],
+          "tolerance": 0.05
+        }
+      }
+    },
+    {
+      "name": "guidance.attempt",
+      "message": {
+        "protocolVersion": 1,
+        "type": "guidance.attempt",
+        "roomId": "r_test",
+        "clientId": "c_host",
+        "messageId": "m-6",
+        "originEpoch": 1,
+        "payload": {
+          "guidanceId": "g_abc",
+          "offset": 0.37,
+          "seq": 12,
+          "holding": true
+        }
+      }
+    }
+  ],
+  "invalidClient": [
+    {
+      "name": "wrong protocol version",
+      "expectedError": "unsupported_protocol",
+      "message": {
+        "protocolVersion": 2,
+        "type": "ping",
+        "roomId": "r_test",
+        "clientId": "c_x",
+        "messageId": "m-x",
+        "payload": {}
+      }
+    },
+    {
+      "name": "negative dimension",
+      "expectedError": "invalid_dimensions",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.create",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-7",
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a12",
+            "kind": "partition",
+            "name": "Bad",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "dimensions": [
+              1,
+              -1,
+              1
+            ],
+            "color": "#ffffff",
+            "textureRef": null
+          }
+        }
+      }
+    },
+    {
+      "name": "elliptical pillar",
+      "expectedError": "invalid_dimensions",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.create",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-8",
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a13",
+            "kind": "pillar",
+            "name": "Oval",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "dimensions": [
+              0.3,
+              2,
+              0.6
+            ],
+            "color": "#ffffff",
+            "textureRef": null
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown kind",
+      "expectedError": "bad_request",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.create",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-9",
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a14",
+            "kind": "sofa",
+            "name": "Sofa",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "dimensions": [
+              1,
+              1,
+              1
+            ],
+            "color": "#ffffff",
+            "textureRef": null
+          }
+        }
+      }
+    },
+    {
+      "name": "geometry message without originEpoch",
+      "expectedError": "bad_request",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.update",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-10",
+        "payload": {
+          "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+          "baseRevision": 1,
+          "patch": {
+            "position": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "comment too long",
+      "expectedError": "bad_request",
+      "message": {
+        "protocolVersion": 1,
+        "type": "comment.add",
+        "roomId": "r_test",
+        "clientId": "c_viewer",
+        "messageId": "m-11",
+        "payload": {
+          "objectId": null,
+          "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      }
+    },
+    {
+      "name": "unknown message type",
+      "expectedError": "bad_request",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.teleport",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-12",
+        "payload": {}
+      }
+    }
+  ],
+  "server": [
+    {
+      "name": "object.updated",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.updated",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "s-1",
+        "sceneRevision": 4,
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+            "kind": "pillar",
+            "name": "Pillar 1",
+            "position": [
+              1.2,
+              0,
+              -1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "dimensions": [
+              0.3,
+              2.5,
+              0.3
+            ],
+            "color": "#c9b79c",
+            "textureRef": null,
+            "revision": 2,
+            "originEpoch": 1,
+            "stale": false,
+            "owner": "expert",
+            "createdBy": "c_expert",
+            "updatedAt": 1760000000000
+          }
+        }
+      }
+    },
+    {
+      "name": "guidance.state active with attempt",
+      "message": {
+        "protocolVersion": 1,
+        "type": "guidance.state",
+        "roomId": "r_test",
+        "clientId": "c_host",
+        "messageId": "s-2",
+        "sceneRevision": 6,
+        "originEpoch": 1,
+        "payload": {
+          "guidance": {
+            "id": "g_abc",
+            "objectId": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+            "state": "active",
+            "axis": "x",
+            "tolerance": 0.05,
+            "start": {
+              "position": [
+                1.2,
+                0,
+                -1
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            "target": {
+              "position": [
+                1.6,
+                0,
+                -1
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            "attempt": {
+              "offset": 0.37,
+              "position": [
+                1.57,
+                0,
+                -1
+              ],
+              "distance": 0.03,
+              "withinTolerance": true,
+              "holding": true,
+              "seq": 12,
+              "updatedAt": 1760000000500
+            },
+            "originEpoch": 1
+          }
+        }
+      }
+    }
+  ]
+}
