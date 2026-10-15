@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ipaddress
+import re
+import socket
 import time
 from urllib.parse import urlsplit
 
@@ -19,21 +21,50 @@ def _addon_prefs():
     return addon.preferences if addon else None
 
 
-def _on_invite(self, _context):
-    parsed = protocol.parse_invite(self.invite)
+NO_CREDENTIAL = ("That link has no credential (#t=…). Opening it in a browser removes it; "
+                 "tap Copy expert invite on the phone and paste here.")
+
+
+def _apply_invite(self, text: str) -> bool:
+    parsed = protocol.parse_invite(text)
     if parsed:
         self.server_url = parsed["server"]
         self.room_code = parsed["code"]
         self.token = parsed["token"]
+        sync.ctrl.last_error = ""
+        return True
+    if "/r/" in text:
+        sync.ctrl.last_error = NO_CREDENTIAL
+    return False
+
+
+def _on_invite(self, _context):
+    if self.invite and (_apply_invite(self, self.invite) or "/r/" in self.invite):
         self.invite = ""  # do not leave the credential on screen
+
+
+def _on_token(self, _context):
+    # A full invite pasted into the credential field (or a field-crossing paste) still works.
+    if "/r/" in self.token or "://" in self.token:
+        text = self.token
+        if not _apply_invite(self, text):
+            self.token = ""
+
+
+def _on_room_code(self, _context):
+    if "/r/" in self.room_code:
+        text = self.room_code
+        if not _apply_invite(self, text):
+            m = re.search(r"/r/([A-Za-z0-9]{4,12})", text)
+            self.room_code = m.group(1).upper() if m else ""
 
 
 class RBSettings(bpy.types.PropertyGroup):
     # Stored on the WindowManager: runtime only, never saved into the .blend file.
     invite: StringProperty(name="Expert invite", description="Paste the expert invite link from the phone", update=_on_invite)
     server_url: StringProperty(name="Server", default="http://127.0.0.1:8787")
-    room_code: StringProperty(name="Room code")
-    token: StringProperty(name="Expert credential", subtype="PASSWORD")
+    room_code: StringProperty(name="Room code", update=_on_room_code)
+    token: StringProperty(name="Expert credential", subtype="PASSWORD", update=_on_token)
     display_name: StringProperty(name="Your name", default="Expert")
     axis: EnumProperty(
         name="Axis",
@@ -68,8 +99,21 @@ def _is_private_host(url: str) -> bool:
     if host in ("localhost",) or host.endswith(".local"):
         return True
     try:
-        return ipaddress.ip_address(host).is_private or ipaddress.ip_address(host).is_loopback
+        ip = ipaddress.ip_address(host)
     except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback or _is_own_address(ip)
+
+
+def _is_own_address(ip) -> bool:
+    # The server usually runs on this Mac; on an IPv6-only hotspot its address is a global IPv6 one.
+    # Binding succeeds only for addresses assigned to this machine; nothing is sent.
+    family = socket.AF_INET6 if ip.version == 6 else socket.AF_INET
+    try:
+        with socket.socket(family, socket.SOCK_DGRAM) as s:
+            s.bind((str(ip), 0))
+        return True
+    except OSError:
         return False
 
 

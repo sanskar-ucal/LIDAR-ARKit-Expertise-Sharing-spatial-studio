@@ -22,7 +22,7 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 
 - [ ] C1. Walking the room shows the mesh overlay; the developer panel counts mesh anchors and faces.
 - [ ] C2. **Send room** shows progress, then "Room sent: N points, M triangles" with **no** "SIMULATED" label.
-- [ ] C3. Blender shows the mesh in `RoomBridge Room Scan (reference)`, not selectable, with the floor at Z = 0 and the area in front of the phone's starting position on +Y. Record the time from tapping Send to the mesh appearing.
+- [ ] C3. Blender shows the mesh in `RoomBridge Room Scan (reference)`, not selectable, with the detected floor height shown in the Room Scan panel (new pillars stand on the real floor) and the area in front of the phone's starting position on +Y. Record the time from tapping Send to the mesh appearing.
 - [ ] C4. A known distance (for example a 1 m tape on the floor) measures about 1 m in Blender. Record the error.
 
 ## D. Objects

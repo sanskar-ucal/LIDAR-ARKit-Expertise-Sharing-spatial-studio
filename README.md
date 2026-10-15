@@ -48,7 +48,7 @@ npm start
 The server prints the address other devices must use, for example:
 
 ```
-RoomBridge server listening on 0.0.0.0:8787
+RoomBridge server listening on [::]:8787
   Same-Wi-Fi URL for the iPhone / Blender / browsers: http://10.0.0.61:8787
 ```
 

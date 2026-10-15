@@ -63,6 +63,26 @@ class ScanFormat(unittest.TestCase):
         self.assertEqual(b[6], (2.0, 3.0, 2.5))
         self.assertTrue(all(z >= 0 for _, _, z in b))
 
+    def test_floor_estimate(self):
+        sample = scan_format.decode((ROOT / "protocol/fixtures/sample-room.rbsc").read_bytes())
+        self.assertAlmostEqual(scan_format.estimate_floor_y(sample), 0.0)
+
+        verts, tris = [], []
+
+        def quad(y, x0, x1, z0, z1):
+            i = len(verts)
+            verts.extend([(x0, y, z0), (x1, y, z0), (x1, y, z1), (x0, y, z1)])
+            tris.extend([(i, i + 1, i + 2), (i, i + 2, i + 3)])
+
+        # Real device: origin at chest height, floor 1.2 m below, plus a table, ceiling and a noise speck.
+        quad(-1.2, -2, 2, -3, 1)      # floor, 16 m^2
+        quad(-0.45, 0, 1, -1, 0)      # table top, 1 m^2
+        quad(1.3, -2, 2, -3, 1)       # ceiling, 16 m^2
+        quad(-1.5, 0, 0.1, 0, 0.1)    # 0.01 m^2 noise below the floor
+        real = scan_format.Scan(1, False, verts, tris)
+        self.assertAlmostEqual(scan_format.estimate_floor_y(real), -1.2, places=5)
+        self.assertIsNone(scan_format.estimate_floor_y(scan_format.Scan(1, False, [], [])))
+
     def test_rejects_bad_scans(self):
         good = scan_format.encode(1, [(0, 0, 0)] * 3, [(0, 1, 2)])
         with self.assertRaises(ValueError):

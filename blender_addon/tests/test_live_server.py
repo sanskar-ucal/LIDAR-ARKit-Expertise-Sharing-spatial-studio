@@ -189,7 +189,7 @@ class LiveServer(unittest.TestCase):
         s = RoomSession(self.base, room["code"], room["viewerToken"], "Not an expert")
         s.start()
         wait_for(s.inbox, lambda m: m["type"] == "local.status" and m["payload"]["status"] == "error")
-        self.assertIn("viewer", s.fatal_error)
+        self.assertIn("view-only", s.fatal_error)
         s.stop()
 
     def test_bad_credential_is_fatal_and_not_retried(self):

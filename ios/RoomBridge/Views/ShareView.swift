@@ -4,6 +4,7 @@ import SwiftUI
 struct ShareView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var copied = false
 
     var body: some View {
         NavigationStack {
@@ -22,11 +23,18 @@ struct ShareView: View {
                 if let link = model.expertLink {
                     Section {
                         Text(link).font(.footnote.monospaced()).textSelection(.enabled)
+                        Button {
+                            UIPasteboard.general.string = link
+                            copied = true
+                        } label: {
+                            Label(copied ? "Copied — paste into Blender" : "Copy expert invite",
+                                  systemImage: copied ? "checkmark" : "doc.on.doc")
+                        }
                         ShareLink(item: link) { Label("Share expert invite", systemImage: "square.and.arrow.up") }
                     } header: {
                         Text("Expert (can edit)")
                     } footer: {
-                        Label("Anyone with this invite can add, move and delete objects. Paste it into the Blender add-on; only send it to your designer.",
+                        Label("Anyone with this invite can add, move and delete objects. Copy it and paste it into the Blender add-on (Universal Clipboard works with the same Apple ID). Don't open it in a browser: the page removes the credential from the address bar. Only send it to your designer.",
                               systemImage: "exclamationmark.shield")
                             .foregroundStyle(Theme.warn)
                     }
