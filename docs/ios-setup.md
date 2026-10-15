@@ -47,7 +47,7 @@ Then:
 
 ## Notes
 
-- ATS: the app talks plain HTTP/WS to the Mac. iOS does not apply App Transport Security to numeric IP addresses, and `NSAllowsLocalNetworking` in `Info.plist` covers `.local` host names. Other host names need HTTPS.
+- ATS: the app talks plain HTTP/WS to the Mac at whatever address the user types. `NSAllowsLocalNetworking` turned out not to cover IPv6 addresses (an iPhone hotspot on an IPv6-only carrier gives the Mac only IPv6), so `Info.plist` sets `NSAllowsArbitraryLoads`. This is acceptable for a local prototype; a deployed version should use HTTPS/WSS and drop the exception.
 - Backgrounding the app pauses the camera and the preview; viewers see "Preview paused". When you return, the app reconnects and resumes.
 - Without Xcode you can still verify the shared logic:
 

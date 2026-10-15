@@ -40,7 +40,8 @@ export interface Config {
 
 export function loadConfig(overrides: Partial<Config> = {}): Config {
   return {
-    host: process.env.HOST || "0.0.0.0",
+    // "::" accepts IPv4 and IPv6; phone hotspots on IPv6-only carriers give the Mac no usable IPv4 address.
+    host: process.env.HOST || "::",
     port: num("PORT", 8787),
     publicUrl: (process.env.PUBLIC_URL || "").replace(/\/+$/, ""),
     serveWeb: (process.env.SERVE_WEB ?? "1") !== "0",

@@ -45,6 +45,8 @@ class Controller:
         self.last_full_scan = 0.0
         self.applying = False
         self.last_target_sig: Any = None
+        self.approving_object = ""
+        self.floor_z = 0.0
         self.foreign_objects = 0
 
     def reset(self) -> None:
@@ -212,6 +214,10 @@ def _handle(s: RoomSession, msg: Dict[str, Any]) -> None:
     elif t in ("object.created", "object.updated"):
         o = p["object"]
         ctrl.server_objects[o["id"]] = o
+        if from_me and t == "object.updated" and o["id"] == ctrl.approving_object:
+            # Approval moves the object server-side; it is not an echo of a local edit.
+            ctrl.approving_object = ""
+            from_me = False
         if ctrl.tracker.on_server_object(o, from_me):
             _apply_object(o)
         else:
@@ -357,7 +363,10 @@ def read_state(obj: bpy.types.Object) -> Optional[Dict[str, Any]]:
         _guarded(lambda: setattr(obj, "scale", (d, d, sz)))
         sx = sy = d
         ctrl.last_error = "Pillars stay round: diameter applied to both X and Y."
-    loc, rot, _scale = obj.matrix_world.decompose()
+    # matrix_world is only refreshed on depsgraph evaluation; matrix_basis reflects
+    # location/rotation/scale immediately (e.g. right after create or apply).
+    matrix = obj.matrix_basis if obj.parent is None else obj.parent.matrix_world @ obj.matrix_parent_inverse @ obj.matrix_basis
+    loc, rot, _scale = matrix.decompose()
     q = coords.normalize_quat(coords.quat_b2c((rot.x, rot.y, rot.z, rot.w)))
     return {
         "name": obj.name[:60],
@@ -429,9 +438,9 @@ def create_object(kind: str, location_b) -> bpy.types.Object:
     obj.rotation_mode = "QUATERNION"
     loc = list(location_b)
     if kind == "panel":
-        loc[2] = max(loc[2], 1.4)  # hang pictures at eye height by default
+        loc[2] = max(loc[2], ctrl.floor_z + 1.4)  # hang pictures at eye height by default
     else:
-        loc[2] = 0.0  # floor-standing primitives sit on the floor plane
+        loc[2] = ctrl.floor_z  # floor-standing primitives sit on the scanned floor
     obj.location = loc
     obj.scale = coords.dims_to_blender_scale(dims)
     primitives.apply_materials(obj, kind, obj["rb_color"], obj["rb_texture"] or None)
@@ -570,8 +579,11 @@ def _import_scan(data: bytes) -> None:
     _guarded(work)
     meta = ctrl.scan_meta or {}
     ctrl.imported_scan_id = meta.get("scanId", "")
+    floor = scan_format.estimate_floor_y(scan)
+    ctrl.floor_z = floor if floor is not None else 0.0
     label = "SAMPLE ROOM (simulated) " if scan.synthetic else ""
-    ctrl.scan_status = f"{label}Scan imported: {len(scan.vertices)} vertices, {len(scan.triangles)} triangles (approximate)"
+    floor_note = f", floor at Z {ctrl.floor_z:+.2f} m" if floor is not None else ", floor not found"
+    ctrl.scan_status = f"{label}Scan imported: {len(scan.vertices)} vertices, {len(scan.triangles)} triangles (approximate){floor_note}"
 
 
 # ---------------------------------------------------------------------- guidance
@@ -603,7 +615,7 @@ def place_target_ghost(design_obj: bpy.types.Object) -> bpy.types.Object:
         ghost.show_in_front = True
         ghost.show_name = True
         ghost.rotation_mode = "QUATERNION"
-        ghost.matrix_world = design_obj.matrix_world.copy()
+        ghost.matrix_basis = design_obj.matrix_basis.copy()
         return ghost
 
     return _guarded(work)
@@ -642,7 +654,7 @@ def _sync_guidance_objects() -> None:
             obj.show_wire = True
             obj.show_in_front = True
             obj.rotation_mode = "QUATERNION"
-        obj.matrix_world = design.matrix_world.copy()
+        obj.matrix_basis = design.matrix_basis.copy()
         obj.location = coords.c2b(attempt["position"])
 
     _guarded(work)
@@ -658,7 +670,7 @@ def send_target(design_obj: bpy.types.Object, axis_choice: str, tolerance: float
     if server is None:
         return "Object is not synced yet"
     start = server["position"]
-    target_c = coords.b2c(ghost.matrix_world.translation)
+    target_c = coords.b2c(ghost.matrix_basis.translation)
     delta = [target_c[i] - start[i] for i in range(3)]
     axis = coords.dominant_axis(delta) if axis_choice == "AUTO" else coords.BLENDER_AXIS_TO_CANONICAL[axis_choice]
     _offset, snapped, perp = coords.project_onto_axis(start, axis, target_c)
@@ -676,6 +688,8 @@ def guidance_command(msg_type: str) -> str:
     g = ctrl.guidance
     if s is None or g is None:
         return "No guidance exercise"
-    s.send(msg_type, {"guidanceId": g["id"]}, origin_epoch=ctrl.origin_epoch if msg_type in protocol.EPOCH_BOUND else None)
+    mid = s.send(msg_type, {"guidanceId": g["id"]}, origin_epoch=ctrl.origin_epoch if msg_type in protocol.EPOCH_BOUND else None)
+    if mid and msg_type == "guidance.approve":
+        ctrl.approving_object = g["objectId"]
     return {"guidance.begin": "Exercise started", "guidance.approve": "Attempt approved",
             "guidance.reset": "Attempt reset", "guidance.cancel": "Guidance cancelled"}.get(msg_type, "Sent")

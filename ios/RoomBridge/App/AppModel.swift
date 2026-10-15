@@ -133,7 +133,7 @@ final class AppModel {
         case .notConnectedToInternet:
             return "The phone is not on a network. Join the same Wi-Fi as the Mac."
         case .appTransportSecurityRequiresSecureConnection:
-            return "iOS blocked plain HTTP for this address. Use the Mac’s numeric IP address (e.g. http://10.0.0.61:8787)."
+            return "iOS blocked plain HTTP for this address. Use the exact address the server prints on the Mac."
         default:
             return e.localizedDescription
         }

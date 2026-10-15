@@ -63,5 +63,6 @@ struct StartView: View {
             .scrollContentBackground(.hidden)
             .background(Theme.warm)
         }
+        .environment(\.colorScheme, .light)  // the warm background is light; Dark Mode text would vanish on it
     }
 }

@@ -40,7 +40,7 @@ All network I/O happens on a background thread; every change to the Blender scen
 
 ## Coordinates
 
-Canonical room space is the phone's ARKit world (Y up, metres). Blender is Z up, so the add-on maps `(x, y, z)` → `(x, −z, y)`: the floor is Blender's XY plane at Z = 0, and "in front of where the phone started" is +Y. Details: [protocol/COORDINATES.md](../protocol/COORDINATES.md).
+Canonical room space is the phone's ARKit world (Y up, metres). Blender is Z up, so the add-on maps `(x, y, z)` → `(x, −z, y)`: the origin is where the phone was when AR started (about chest height), and "in front of where the phone started" is +Y. The real floor is usually around Z = −1.2; the add-on detects it from the scan (shown in the Room Scan panel) and stands new pillars and partitions on it. Details: [protocol/COORDINATES.md](../protocol/COORDINATES.md).
 
 ## Room scan
 

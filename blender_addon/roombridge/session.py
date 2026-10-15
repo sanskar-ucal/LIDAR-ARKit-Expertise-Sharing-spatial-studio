@@ -174,7 +174,8 @@ class RoomSession:
                 p = msg["payload"]
                 self.client_id, self.room_id, self.role = p["clientId"], p["roomId"], p["role"]
                 if self.role != "expert":
-                    self.fatal_error = f"This invitation is for a {self.role}, not the expert."
+                    self.fatal_error = (f"That is the {'family (view-only)' if self.role == 'viewer' else self.role} link. "
+                                        "Copy the link under 'Expert (can edit)' on the phone instead.")
                     self._set_status("error", self.fatal_error)
                     self._stop.set()
                     return False
