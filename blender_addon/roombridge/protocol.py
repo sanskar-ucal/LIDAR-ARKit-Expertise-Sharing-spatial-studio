@@ -8,7 +8,7 @@ import uuid
 from typing import Any, Dict, Optional
 
 PROTOCOL_VERSION = 1
-KINDS = ("pillar", "partition", "panel")
+KINDS = ("pillar", "partition", "panel", "doorway", "window", "table", "chair", "light", "lamp", "tv", "couch", "cabinet")
 TEXTURES = (None, "sample:picture")
 DIM_MIN, DIM_MAX = 0.01, 20.0
 POS_MAX = 100.0

@@ -276,36 +276,49 @@ class _Base:
     bl_category = "RoomBridge"
 
 
-class ROOMBRIDGE_PT_main(_Base, bpy.types.Panel):
-    bl_label = "RoomBridge"
-    bl_idname = "ROOMBRIDGE_PT_main"
+class ROOMBRIDGE_PT_design(_Base, bpy.types.Panel):
+    bl_label = "Design Objects"
+    bl_parent_id = "ROOMBRIDGE_PT_main"
 
-    def draw(self, context):
-        layout = self.layout
-        st = _settings(context)
+    @classmethod
+    def poll(cls, _context):
+        return sync.ctrl.session is not None
+
+    def draw(self, _context):
         c = sync.ctrl
-        connected = sync.is_connected()
-        icon = "CHECKMARK" if connected else ("ERROR" if c.status.startswith("Error") else "TIME" if c.session else "UNLINKED")
+        layout = self.layout
+        layout.label(text="Structure & Openings:")
+        row = layout.row(align=True)
+        row.operator("roombridge.add_object", text="Pillar", icon="MESH_CYLINDER").kind = "pillar"
+        row.operator("roombridge.add_object", text="Partition", icon="MESH_CUBE").kind = "partition"
+        row.operator("roombridge.add_object", text="Doorway", icon="MESH_GRID").kind = "doorway"
+        row.operator("roombridge.add_object", text="Window", icon="MESH_UVSPHERE").kind = "window"
+        layout.label(text="Furniture:")
+        row = layout.row(align=True)
+        row.operator("roombridge.add_object", text="Table", icon="MESH_TABLE").kind = "table"
+        row.operator("roombridge.add_object", text="Chair", icon="CHAIR_SET").kind = "chair"
+        row.operator("roombridge.add_object", text="Couch", icon="OUTLINER_OB_GROUP_INSTANCE").kind = "couch"
+        row.operator("roombridge.add_object", text="Cabinet", icon="MESH_CUBE").kind = "cabinet"
+        layout.label(text="Electronics & Decor:")
+        row = layout.row(align=True)
+        row.operator("roombridge.add_object", text="TV", icon="TV").kind = "tv"
+        row.operator("roombridge.add_object", text="Picture", icon="IMAGE_PLANE").kind = "panel"
+        row.operator("roombridge.add_object", text="Light", icon="LIGHT_DATA").kind = "light"
+        row.operator("roombridge.add_object", text="Lamp", icon="LIGHT_POINT").kind = "lamp"
+        layout.label(text="Edit with Move (G), Rotate (R), Scale (S). Delete (X) syncs.")
+        col = layout.column(align=True)
+        for o in sorted(c.server_objects.values(), key=lambda o: o["name"]):
+            r = c.reactions.get(o["id"], {})
+            likes, discuss = len(r.get("like", [])), len(r.get("discuss", []))
+            n_comments = sum(1 for k in c.comments if k.get("objectId") == o["id"])
+            extra = f"  {likes} like" if likes else ""
+            extra += f"  {discuss} discuss" if discuss else ""
+            extra += f"  {n_comments} comment(s)" if n_comments else ""
+            col.label(text=f"{o['name']}  r{o['revision']}{'  STALE' if o.get('stale') else ''}{extra}")
         box = layout.box()
-        box.label(text=c.status, icon=icon)
-        if c.last_sync:
-            box.label(text=f"Last sync {max(0, int(time.time() - c.last_sync))} s ago")
-        if c.session is None:
-            col = layout.column(align=True)
-            col.prop(st, "invite", text="Invite", icon="PASTEDOWN")
-            col.separator()
-            col.prop(st, "server_url")
-            col.prop(st, "room_code")
-            col.prop(st, "token")
-            col.prop(st, "display_name")
-            layout.operator("roombridge.connect", icon="LINKED")
-        else:
-            row = layout.row()
-            row.label(text=f"Room {c.room.get('code', st.room_code)}  ·  origin epoch {c.origin_epoch}")
-            layout.operator("roombridge.disconnect", icon="UNLINKED")
-        if c.last_error:
-            layout.label(text=c.last_error[:90], icon="INFO")
-
+        box.label(text="Not synced (local only):", icon="INFO")
+        box.label(text="mesh/edit-mode edits, modifiers, parenting,")
+        box.label(text="materials, animation, negative scale.")
 
 class ROOMBRIDGE_PT_people(_Base, bpy.types.Panel):
     bl_label = "Participants"

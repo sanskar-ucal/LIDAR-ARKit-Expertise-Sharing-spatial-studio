@@ -16,9 +16,9 @@ TARGET_NAME = "RB TARGET (ghost)"
 ATTEMPT_NAME = "RB NOVICE ATTEMPT"
 SCAN_NAME = "RB Room Scan (approximate)"
 
-DEFAULT_COLORS = {"pillar": "#c9b79c", "partition": "#d8cfc0", "panel": "#ffffff"}
-DEFAULT_DIMENSIONS = {"pillar": (0.3, 2.4, 0.3), "partition": (1.2, 2.0, 0.1), "panel": (0.8, 0.6, 0.03)}
-DEFAULT_NAMES = {"pillar": "Pillar", "partition": "Partition", "panel": "Picture Panel"}
+DEFAULT_COLORS = {"pillar": "#c9b79c", "partition": "#d8cfc0", "panel": "#ffffff", "doorway": "#8b5a2b", "window": "#add8e6", "table": "#8b4513", "chair": "#654321", "light": "#ffffe0", "lamp": "#fffacd", "tv": "#1c1c1c", "couch": "#4a3b32", "cabinet": "#5c4033"}
+DEFAULT_DIMENSIONS = {"pillar": (0.3, 2.4, 0.3), "partition": (1.2, 2.0, 0.1), "panel": (0.8, 0.6, 0.03), "doorway": (0.9, 2.1, 0.15), "window": (1.0, 1.2, 0.15), "table": (1.2, 0.75, 0.8), "chair": (0.5, 0.5, 0.9), "light": (0.2, 0.2, 0.1), "lamp": (0.3, 0.3, 1.5), "tv": (1.2, 0.7, 0.1), "couch": (2.0, 0.9, 0.85), "cabinet": (0.9, 0.45, 1.8)}
+DEFAULT_NAMES = {"pillar": "Pillar", "partition": "Partition", "panel": "Picture Panel", "doorway": "Doorway", "window": "Window", "table": "Table", "chair": "Chair", "light": "Light Fixture", "lamp": "Floor Lamp", "tv": "Television", "couch": "Couch", "cabinet": "Cabinet"}
 
 
 def ensure_collection(name: str, selectable: bool = True) -> bpy.types.Collection:
@@ -49,7 +49,7 @@ def unit_mesh(kind: str, name: str) -> bpy.types.Mesh:
         if kind == "pillar":
             bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=32, radius1=0.5, radius2=0.5, depth=1.0)
             bmesh.ops.translate(bm, verts=bm.verts, vec=(0.0, 0.0, 0.5))  # origin at base centre
-        elif kind == "partition":
+        elif kind in ("partition", "doorway", "window", "table", "chair", "couch", "cabinet", "lamp"):
             bmesh.ops.create_cube(bm, size=1.0)
             bmesh.ops.translate(bm, verts=bm.verts, vec=(0.0, 0.0, 0.5))  # origin at bottom centre
         else:
