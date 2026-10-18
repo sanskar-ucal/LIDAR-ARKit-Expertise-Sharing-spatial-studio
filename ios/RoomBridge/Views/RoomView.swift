@@ -31,10 +31,17 @@ struct RoomView: View {
                     LearnToast(item: item).onTapGesture { showLearn = true }
                 }
                 Spacer()
+                HStack(alignment: .bottom) {
+                    LessonChip()
+                    Spacer()
+                    TalkButton()
+                }
                 if model.placingKind != nil {
                     PlacementPanel()
                 } else if model.guidance != nil {
                     GuidancePanel()
+                } else if model.lesson != nil && !model.lessonCollapsed {
+                    LessonCard()
                 } else if model.editingProposal != nil {
                     ProposalPanel()
                 } else {

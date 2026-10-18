@@ -129,11 +129,23 @@ describe("state reducer", () => {
     expect(s.guidance?.attempt?.withinTolerance).toBe(true);
     expect(s.room?.sceneRevision).toBe(9);
     expect(guidanceCaption(s.guidance, s.objects)?.title).toBe("“Pillar 1” is on target");
-    // The expert's decision is explained in Blender terms, with their note.
-    expect(s.feed[0]?.actor).toBe("Sam");
-    expect(s.feed[0]?.steps.map((x) => x.text)).toEqual(["approved H’s Couch after adjusting it", "moved it 30 cm along the green Y axis (forward/back)"]);
-    expect(s.feed[0]?.steps[1]?.shortcut).toBe("G Y -0.3");
-    expect(s.feed[0]?.note).toMatch(/door can open/);
+    // Newest first: the voice note, the expert's prompt with its demo in Blender keys, then the proposal decision.
+    expect(s.feed[0]?.title).toBe("🎤 Sam: Put the couch against that wall");
+    expect(s.comments.at(-1)?.voice).toEqual({ clipId: "v_abc123", durationMs: 2400, mime: "audio/mp4" });
+    expect(s.feed[1]?.title).toBe("Sam asks H: Watch how Pillar 1 moves 50 cm along the red X axis");
+    expect(s.feed[1]?.steps[0]?.shortcut).toBe("G X 0.5");
+    expect(s.lesson?.state).toBe("open");
+    const decision = s.feed[2]!;
+    expect(decision.actor).toBe("Sam");
+    expect(decision.steps.map((x) => x.text)).toEqual(["approved H’s Couch after adjusting it", "moved it 30 cm along the green Y axis (forward/back)"]);
+    expect(decision.steps[1]?.shortcut).toBe("G Y -0.3");
+    expect(decision.note).toMatch(/door can open/);
+    // The novice finishing the prompt is announced once.
+    const done = { ...messages.server.find((f: any) => f.message.type === "lesson.state").message };
+    done.payload = { lesson: { ...done.payload.lesson, state: "done", doneAt: 1760000009000 } };
+    s = reduce(s, done);
+    expect(s.feed[0]?.title).toBe("H finished: Watch how Pillar 1 moves 50 cm along the red X axis");
+    expect(reduce(s, done).feed.length).toBe(s.feed.length);
   });
 
   it("marks comments on deleted objects instead of dropping them", () => {

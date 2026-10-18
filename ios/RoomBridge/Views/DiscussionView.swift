@@ -21,7 +21,7 @@ struct DiscussionView: View {
                 }
                 Section("Objects") {
                     if model.objects.isEmpty {
-                        Text("No objects yet. The expert adds them in Blender.").foregroundStyle(.secondary)
+                        Text("No objects yet. The expert adds them in Blender, or propose one with ＋.").foregroundStyle(.secondary)
                     }
                     ForEach(model.objects) { o in
                         objectRow(o)
@@ -39,7 +39,15 @@ struct DiscussionView: View {
                                     Text("on \(name)\(c.objectDeleted ? " (deleted)" : "")").font(.caption2).foregroundStyle(Theme.accent)
                                 }
                             }
-                            Text(c.text)
+                            if let v = c.voice {
+                                Button { model.play(c) } label: {
+                                    Label(model.playingClipId == v.clipId ? "Stop" : "Play voice note (\(max(1, v.durationMs / 1000)) s)",
+                                          systemImage: model.playingClipId == v.clipId ? "stop.circle.fill" : "play.circle.fill")
+                                        .font(.callout)
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                            Text(c.voice != nil ? "🎤 \(c.text)" : c.text)
                         }
                     }
                 }
@@ -75,7 +83,7 @@ struct DiscussionView: View {
             } label: {
                 VStack(alignment: .leading) {
                     Text(o.name + (o.stale ? " (stale)" : "")).font(.body.weight(selected ? .bold : .regular))
-                    Text(o.kind.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
+                    Text(AppCatalog.kind(o.kind).label + (o.proposal != nil ? " · your proposal" : "")).font(.caption).foregroundStyle(.secondary)
                 }
             }
             .buttonStyle(.plain)

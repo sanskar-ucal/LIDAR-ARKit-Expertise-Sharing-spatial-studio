@@ -486,6 +486,41 @@ label {
   margin-top: 0.2rem;
   font-style: italic;
 }
+.ptt {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.ptt-button {
+  width: 100%;
+  padding: 0.7rem;
+  border-radius: 999px;
+  border: none;
+  font-weight: 700;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.ptt-button.on {
+  background: #c0403a;
+}
+.ptt-review {
+  display: flex;
+  gap: 0.4rem;
+}
+.ptt-review input {
+  flex: 1;
+}
+.warn-text {
+  color: #8a5410;
+}
+.autoplay {
+  display: block;
+  margin-top: 0.4rem;
+}
+
 kbd {
   display: inline-block;
   min-width: 1.4em;

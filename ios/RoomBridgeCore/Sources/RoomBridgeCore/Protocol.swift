@@ -166,6 +166,35 @@ public struct Comment: Codable, Equatable, Sendable, Identifiable {
     public var text: String
     public var createdAt: Double
     public var objectDeleted: Bool
+    /// A push-to-talk clip; `text` is its transcript or caption.
+    public var voice: VoiceInfo?
+}
+
+public struct VoiceInfo: Codable, Equatable, Sendable {
+    public var clipId: String
+    public var durationMs: Int
+    public var mime: String
+}
+
+/// An expert's teaching prompt, optionally with a "show me" demo of a real object.
+public struct Lesson: Codable, Equatable, Sendable, Identifiable {
+    public enum Preset: String, Codable, Sendable { case scan, move, rotate, scale, place, custom }
+    public enum State: String, Codable, Sendable { case open, done }
+    public struct Demo: Codable, Equatable, Sendable {
+        public var from: ObjectPose
+        public var to: ObjectPose
+    }
+    public var id: String
+    public var preset: Preset
+    public var text: String
+    public var objectId: String?
+    public var kind: ObjectKind?
+    public var demo: Demo?
+    public var byName: String
+    public var state: State
+    public var createdAt: Double
+    public var doneAt: Double?
+    public var originEpoch: Int
 }
 
 public struct Reactions: Codable, Equatable, Sendable {
@@ -208,6 +237,7 @@ public struct Snapshot: Codable, Sendable {
     public var participants: [Participant]
     public var objects: [SceneObject]
     public var guidance: Guidance?
+    public var lesson: Lesson?
     public var comments: [Comment]
     public var reactions: [String: Reactions]
     public var scan: ScanMeta?
@@ -281,6 +311,7 @@ public enum ServerEvent: Sendable {
     case reactionUpdated(objectId: String, Reactions)
     case guidance(Guidance?)
     case proposalResolved(ProposalResolved)
+    case lesson(Lesson?)
     case scanReady(ScanMeta)
     case previewStatus(PreviewStatus)
     case roomEnded(String)
@@ -301,6 +332,7 @@ public enum ServerMessageDecoder {
     struct CommentPayload: Decodable { var comment: Comment }
     struct ReactionPayload: Decodable { var objectId: String; var like: [String]; var discuss: [String] }
     struct GuidancePayload: Decodable { var guidance: Guidance? }
+    struct LessonPayload: Decodable { var lesson: Lesson? }
     struct ScanPayload: Decodable { var scan: ScanMeta }
     struct EndedPayload: Decodable { var reason: String }
     struct AckPayload: Decodable { var ackOf: String }
@@ -326,6 +358,7 @@ public enum ServerMessageDecoder {
             event = .reactionUpdated(objectId: r.objectId, Reactions(like: r.like, discuss: r.discuss))
         case "guidance.state": event = .guidance(try p(GuidancePayload.self).guidance)
         case "proposal.resolved": event = .proposalResolved(try p(ProposalResolved.self))
+        case "lesson.state": event = .lesson(try p(LessonPayload.self).lesson)
         case "scan.ready": event = .scanReady(try p(ScanPayload.self).scan)
         case "preview.status": event = .previewStatus(try p(PreviewStatus.self))
         case "room.ended": event = .roomEnded(try p(EndedPayload.self).reason)
@@ -380,18 +413,34 @@ public struct SelectionPayload: Encodable, Sendable {
 }
 
 public struct CommentPayload: Encodable, Sendable {
+    public struct Voice: Encodable, Sendable {
+        public var clipId: String
+        public var durationMs: Int
+        public init(clipId: String, durationMs: Int) {
+            self.clipId = clipId
+            self.durationMs = durationMs
+        }
+    }
     public var objectId: String?
     public var text: String
-    public init(objectId: String?, text: String) {
+    public var voice: Voice?
+    public init(objectId: String?, text: String, voice: Voice? = nil) {
         self.objectId = objectId
         self.text = text
+        self.voice = voice
     }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(objectId, forKey: .objectId)
         try c.encode(text, forKey: .text)
+        try c.encodeIfPresent(voice, forKey: .voice)
     }
-    enum CodingKeys: String, CodingKey { case objectId, text }
+    enum CodingKeys: String, CodingKey { case objectId, text, voice }
+}
+
+public struct LessonIdPayload: Encodable, Sendable {
+    public var lessonId: String
+    public init(lessonId: String) { self.lessonId = lessonId }
 }
 
 public struct ReactionPayload: Encodable, Sendable {

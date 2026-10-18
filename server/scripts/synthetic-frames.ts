@@ -5,9 +5,10 @@
  * ./synthetic-frames. Every frame carries the synthetic flag in its header and the
  * images themselves say "SYNTHETIC TEST FRAME", so this can never be mistaken for a
  * camera or LiDAR result. With --objects it also joins as an expert and adds a few
- * objects; with --propose the host proposes a table and a chair for the expert to review.
+ * objects (and with --teach sends a show-me prompt); with --propose the host proposes a
+ * table and a chair for the expert to review.
  *
- *   npm run synthetic-frames -w server -- --server http://127.0.0.1:8787 --fps 5 --objects --propose
+ *   npm run synthetic-frames -w server -- --server http://127.0.0.1:8787 --fps 5 --objects --teach --propose
  */
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
@@ -121,11 +122,21 @@ async function main() {
       { kind: "partition", name: "Partition", position: [-0.5, 0, -2], dimensions: [1.2, 1.8, 0.08], color: "#c9b79c" },
       { kind: "panel", name: "Picture panel", position: [0, 1.4, -2.9], dimensions: [0.8, 0.6, 0.03], color: "#ffffff", textureRef: "sample:picture" },
     ];
+    const ids: string[] = [];
     for (const o of objects) {
       const object = { id: randomUUID(), rotation: [0, 0, 0, 1], textureRef: null, ...o };
+      ids.push(object.id);
       send(expert.ws, expert.auth, "object.create", { object }, expert.epoch());
     }
     console.log(`  Added ${objects.length} sample objects as "Synthetic expert".`);
+    if (flag("teach")) {
+      // A show-me prompt: the pillar moving 50 cm along Blender X (canonical +x).
+      const from = { position: [0.6, 0, -1.8], rotation: [0, 0, 0, 1], dimensions: [0.3, 2.4, 0.3] };
+      const to = { ...from, position: [1.1, 0, -1.8] };
+      const lesson = { preset: "move", text: "Watch how Pillar moves 50 cm along the red X axis (G X)", objectId: ids[0], demo: { from, to } };
+      setTimeout(() => send(expert.ws, expert.auth, "lesson.prompt", lesson, expert.epoch()), 300);
+      console.log("  Sent a show-me prompt as the expert.");
+    }
   }
 
   if (flag("propose")) {

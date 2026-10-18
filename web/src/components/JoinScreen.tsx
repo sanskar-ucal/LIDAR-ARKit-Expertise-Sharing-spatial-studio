@@ -29,8 +29,9 @@ export function JoinScreen({ invite, name: initialName, onJoin }: Props) {
         <h1>RoomBridge</h1>
         {invite ? (
           <p className="lead">
-            You’re invited to watch room <strong className="mono">{invite.code}</strong>. You’ll see the phone’s live preview
-            and the objects the expert places, and you can leave comments.
+            You’re invited to watch room <strong className="mono">{invite.code}</strong> and learn along. You’ll see the phone’s
+            live preview and the objects the expert places, each change explained with the Blender keys behind it, and you can
+            hear and read voice notes and leave comments.
           </p>
         ) : (
           <>
@@ -55,7 +56,9 @@ export function JoinScreen({ invite, name: initialName, onJoin }: Props) {
         <button type="submit" className="primary">
           Join room
         </button>
-        <p className="fine">Nothing is recorded. The preview only appears while the phone user chooses to share it.</p>
+        <p className="fine">
+          Nothing is recorded. The preview only appears while the phone user chooses to share it; voice notes exist only while the room is open.
+        </p>
       </form>
     </main>
   );

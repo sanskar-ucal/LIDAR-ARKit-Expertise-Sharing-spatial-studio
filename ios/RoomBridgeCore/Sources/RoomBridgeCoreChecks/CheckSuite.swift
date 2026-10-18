@@ -98,6 +98,12 @@ public final class CheckSuite {
                     check(abs(g.targetOffset - 0.4) < 1e-9, "guidance target offset")
                 case ("object.created", .objectUpserted), ("proposal.resolved", .proposalResolved):
                     break  // checked in proposalMessages()
+                case ("lesson.state", .lesson(let l?)):
+                    check(l.preset == .move && l.kind == .pillar && l.state == .open && l.demo?.to.position == Vec3(1.7, 0, -1),
+                          "decode lesson.state with demo")
+                case ("comment.added", .commentAdded(let c)):
+                    check(c.voice?.clipId == "v_abc123" && c.voice?.durationMs == 2400 && c.voice?.mime == "audio/mp4" && c.authorRole == .expert,
+                          "decode voice note comment")
                 default:
                     check(false, "unexpected decode for \(s["name"]!)")
                 }
@@ -262,5 +268,13 @@ public final class CheckSuite {
                                                  roomId: "r", clientId: "c", originEpoch: 1)
         let u = String(decoding: upd, as: UTF8.self)
         check(u.contains(#""patch":{"rotation":[0,1,0,0]}"#) && u.contains(#""originEpoch":1"#), "update patch only carries changed fields")
+        // A push-to-talk note encodes exactly like the shared fixture.
+        let voiceFixture = (fx["validClient"] as! [[String: Any]]).first { ($0["name"] as! String) == "comment.add voice note" }!["message"] as! [String: Any]
+        let (_, vdata) = try MessageEncoder.encode(
+            type: "comment.add", payload: CommentPayload(objectId: nil, text: "Should the couch face the window?", voice: .init(clipId: "v_abc123", durationMs: 2400)),
+            roomId: "r_test", clientId: "c_host", originEpoch: 1, messageId: "m-18")
+        check((try JSONSerialization.jsonObject(with: vdata) as! NSDictionary).isEqual(to: voiceFixture), "encoded voice comment equals fixture")
+        let (_, plain) = try MessageEncoder.encode(type: "comment.add", payload: CommentPayload(objectId: nil, text: "hi"), roomId: "r", clientId: "c", originEpoch: nil)
+        check(!String(decoding: plain, as: UTF8.self).contains("voice"), "text comments carry no voice field")
     }
 }

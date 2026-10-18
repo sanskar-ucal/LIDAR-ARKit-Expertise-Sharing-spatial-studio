@@ -17,7 +17,7 @@
 
 **"Room code or invitation is not valid".** The room ended or expired (30 minutes idle, 12 hours maximum by default, and server restarts end all rooms), or the link was cut off when copying. Create a new room on the phone and share fresh links.
 
-**Blender rejects the invite as a viewer link.** You pasted the family link. Use the **expert invite** from the phone's Invite screen.
+**Blender rejects the invite as a viewer link.** You pasted the observer (viewer) link. Use the **expert invite** from the phone's Invite screen.
 
 **"Too many join attempts".** The server rate-limits joining (30 attempts per minute per IP, and 10 failed attempts per minute). Wait a minute.
 

@@ -50,10 +50,10 @@ struct LearnToast: View {
                 Button { model.dismissToast() } label: { Image(systemName: "xmark").font(.caption.bold()) }
                     .buttonStyle(.plain).foregroundStyle(.secondary)
             }
-            if let first = item.steps.first, !first.shortcut.isEmpty { ShortcutLine(step: first) }
+            if let first = item.leadStep, !first.shortcut.isEmpty { ShortcutLine(step: first) }
             ForEach(Array(item.details.enumerated()), id: \.offset) { _, s in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("then \(s.text)").font(.caption)
+                    Text(item.title == nil ? "then \(s.text)" : s.text).font(.caption)
                     if !s.shortcut.isEmpty { ShortcutLine(step: s) }
                 }
             }
@@ -80,7 +80,7 @@ struct LearnToast: View {
 
     private var icon: String {
         switch item.tone {
-        case .info: return item.actor == "You" ? "hand.point.up.left.fill" : "cube.transparent"
+        case .info: return item.actor == "You" ? "hand.point.up.left.fill" : (item.title?.hasPrefix("🎤") == true ? "mic.fill" : "cube.transparent")
         case .success: return "checkmark.seal.fill"
         case .warning: return "arrow.uturn.backward.circle.fill"
         }
@@ -134,9 +134,9 @@ struct LearnSheet: View {
                     ForEach(model.learnFeed) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.headline).font(.callout)
-                            if let s = item.steps.first, !s.shortcut.isEmpty { ShortcutLine(step: s) }
+                            if let s = item.leadStep, !s.shortcut.isEmpty { ShortcutLine(step: s) }
                             ForEach(Array(item.details.enumerated()), id: \.offset) { _, s in
-                                Text("then \(s.text)").font(.caption)
+                                Text(item.title == nil ? "then \(s.text)" : s.text).font(.caption)
                                 if !s.shortcut.isEmpty { ShortcutLine(step: s) }
                             }
                             if let note = item.note { Text(note).font(.caption).italic().foregroundStyle(.secondary) }

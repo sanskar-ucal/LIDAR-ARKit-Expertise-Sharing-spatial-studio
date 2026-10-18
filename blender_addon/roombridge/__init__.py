@@ -24,11 +24,11 @@ if "bpy" in locals():
             sync.disconnect()  # noqa: F821
         except Exception:
             pass
-    for _name in ("coords", "catalog", "protocol", "ws_client", "session", "tracker", "scan_format", "primitives", "sync", "ui"):
+    for _name in ("coords", "catalog", "lessons", "protocol", "ws_client", "session", "tracker", "scan_format", "primitives", "sync", "ui"):
         if _name in locals():
             importlib.reload(locals()[_name])
 
-from . import catalog, coords, protocol, scan_format, session, tracker, ws_client  # noqa: E402,F401
+from . import catalog, coords, lessons, protocol, scan_format, session, tracker, ws_client  # noqa: E402,F401
 
 try:
     import bpy  # noqa: E402,F401

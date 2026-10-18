@@ -13,11 +13,11 @@ struct ShareView: View {
                     Section {
                         QRCodeView(text: link).frame(maxWidth: .infinity).padding(.vertical, 8)
                         Text(link).font(.footnote.monospaced()).textSelection(.enabled)
-                        ShareLink(item: link) { Label("Share viewer link", systemImage: "square.and.arrow.up") }
+                        ShareLink(item: link) { Label("Share observer link", systemImage: "square.and.arrow.up") }
                     } header: {
-                        Text("Family (view only)")
+                        Text("Observers (learners, view only)")
                     } footer: {
-                        Text("Viewers can watch the preview, see objects and comment. They cannot edit.")
+                        Text("Observers watch the preview, follow the CAD lessons, hear and read voice notes, and comment. They cannot edit.")
                     }
                 }
                 if let link = model.expertLink {

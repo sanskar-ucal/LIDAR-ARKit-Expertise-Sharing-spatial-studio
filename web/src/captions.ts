@@ -11,7 +11,7 @@ export function formatMeters(m: number): string {
   return a < 1 ? `${Math.round(a * 100)} cm` : `${a.toFixed(2)} m`;
 }
 
-/** Plain-language narration of the guidance step for family viewers. */
+/** Plain-language narration of the guidance step for observers. */
 export function guidanceCaption(g: Guidance | null, objects: SceneObject[]): Caption | null {
   if (!g) return null;
   const obj = objects.find((o) => o.id === g.objectId);

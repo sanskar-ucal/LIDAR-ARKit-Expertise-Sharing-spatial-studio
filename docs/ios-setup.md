@@ -36,7 +36,7 @@ Then:
 
 1. Start the server on the Mac (`npm run build && npm start`) and note the printed `http://<mac-ip>:8787` address.
 2. In the app, enter that address (for example `http://10.0.0.61:8787`) and your name.
-3. Tap **Create room (LiDAR scan)**. Allow **Camera** and **Local Network** when iOS asks. If you declined Local Network by accident: Settings › Privacy & Security › Local Network › RoomBridge.
+3. Tap **Create room (LiDAR scan)**. Allow **Camera** and **Local Network** when iOS asks. If you declined Local Network by accident: Settings › Privacy & Security › Local Network › RoomBridge. The first time you hold the **mic** button, iOS also asks for **Microphone** and **Speech Recognition**; transcription runs on the iPhone only, and if your language has no on-device model the note is sent as audio without text.
 4. Use the bottom bar:
    - **QR icon (Invite):** viewer QR code and link, the expert invite (grants editing; send only to the designer), and the room code.
    - **Send room:** simplifies the current LiDAR mesh (up to about 120k vertices / 200k triangles) and uploads it. After a successful upload the mesh overlay is hidden and the scan is frozen.

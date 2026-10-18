@@ -14,7 +14,8 @@ KINDS = catalog.KINDS
 TEXTURES = (None, "sample:picture")
 DIM_MIN, DIM_MAX = 0.01, 20.0
 POS_MAX = 100.0
-EPOCH_BOUND = {"object.create", "object.propose", "object.update", "guidance.set", "guidance.begin", "guidance.attempt"}
+EPOCH_BOUND = {"object.create", "object.propose", "object.update", "guidance.set", "guidance.begin", "guidance.attempt",
+               "lesson.prompt"}
 
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 _COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")

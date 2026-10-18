@@ -56,6 +56,21 @@ The novice can place pieces from the phone's object library. They arrive outline
 
 The novice's phone confirms with a haptic and explains what you changed in Blender keys, together with your note. Accept a proposal before using it in a guidance exercise.
 
+## Teach with prompts and "show me" demos
+
+The **Teach (Prompts & Show Me)** panel sends one prompt at a time to the phone:
+
+- **Scan the room**: completes by itself when the phone sends a scan.
+- **Place a piece** (choose which): completes when the novice proposes that piece.
+- **Show: move / rotate / scale**: select a design object, pick the axis and the distance, angle or factor. The phone loops a teal ghost of that object doing the operation (it is a demonstration only; the object itself does not change), with the Blender keys, e.g. **G X 0.5**. The novice taps **Got it**.
+- **Custom task**: your own text.
+
+Leave **Text** empty for a ready-made instruction. The panel shows whether the novice has finished; **Clear Prompt** removes it.
+
+## Voice notes
+
+Blender cannot record audio, so talk from a browser on the same Mac: open the expert invite as `http://localhost:8787/r/CODE#t=…` (browsers only allow the microphone on localhost or HTTPS; the page offers a localhost link if you opened the LAN address). Hold **Hold to talk**, release, type or check the text everyone will read, and **Send voice note**. The novice's phone plays it straight away. The novice's voice notes (transcribed on the phone) appear in Blender's **Discussion** panel and play in that browser tab.
+
 ## Guide the novice
 
 1. Select a design object and press **Place Target Ghost**: a wireframe twin `RB TARGET (ghost)` appears.
@@ -85,4 +100,4 @@ The `bpy`-dependent modules (`sync`, `primitives`, `ui`) are exercised headless 
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python blender_addon/tests/blender_e2e.py
 ```
 
-It covers connecting from an invite, scan import, every catalog kind, transform sync, guidance, proposals (accept with an adjustment and a note, reject), and drawing every panel against a stand-in layout. Real panel drawing and clicking still need the GUI; see [device-checklist.md](device-checklist.md).
+It covers connecting from an invite, scan import, every catalog kind, transform sync, guidance, proposals (accept with an adjustment and a note, reject), a show-me prompt that the phone completes, a voice note from the phone, and drawing every panel against a stand-in layout. Real panel drawing and clicking still need the GUI; see [device-checklist.md](device-checklist.md).

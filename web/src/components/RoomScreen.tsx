@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { guidanceCaption } from "../captions";
 import { RoomClient } from "../client";
-import { ROLE_LABEL } from "../protocol";
+import { ROLE_LABEL, type Comment } from "../protocol";
 import type { StoredInvite } from "../session";
 import { Comments } from "./Comments";
 import { DevPanel } from "./DevPanel";
 import { LearningFeed } from "./LearningFeed";
+import { LessonBanner } from "./LessonBanner";
+import { PushToTalk } from "./PushToTalk";
 import { ObjectList } from "./ObjectList";
 import { Participants } from "./Participants";
 import { PreviewPanel } from "./PreviewPanel";
@@ -60,6 +62,50 @@ export function RoomScreen({ invite, displayName, onLeave }: Props) {
     client.send("selection", { objectId: id });
   };
 
+  // Voice notes: play on demand, and auto-play new ones from others (walkie-talkie style).
+  const [playing, setPlaying] = useState<string | null>(null);
+  const [autoPlay, setAutoPlay] = useState(true);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const heard = useRef<Set<string> | null>(null);
+  const play = async (c: Comment) => {
+    if (!c.voice) return;
+    audio.current?.pause();
+    if (playing === c.voice.clipId) {
+      setPlaying(null);
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(await client.fetchVoice(c.voice.clipId));
+      const a = new Audio(url);
+      audio.current = a;
+      setPlaying(c.voice.clipId);
+      a.onended = () => {
+        setPlaying(null);
+        URL.revokeObjectURL(url);
+      };
+      await a.play();
+    } catch {
+      setPlaying(null);
+    }
+  };
+  useEffect(() => {
+    const voiced = s.comments.filter((c) => c.voice);
+    if (heard.current === null) {
+      if (s.room) heard.current = new Set(voiced.map((c) => c.voice!.clipId)); // don't replay history
+      return;
+    }
+    const fresh = voiced.filter((c) => !heard.current!.has(c.voice!.clipId));
+    for (const c of fresh) heard.current.add(c.voice!.clipId);
+    const last = fresh[fresh.length - 1];
+    if (autoPlay && last && last.authorId !== s.clientId) void play(last);
+  }, [s.comments, s.room]);
+
+  const sendVoice = async (blob: Blob, durationMs: number, caption: string) => {
+    const clipId = await client.uploadVoice(blob);
+    if (!client.send("comment.add", { objectId: selected, text: caption, voice: { clipId, durationMs } })) throw new Error("not connected");
+  };
+  const localLink = `http://localhost${window.location.port ? `:${window.location.port}` : ""}/r/${invite.code}#t=${invite.token}`;
+
   return (
     <div className="room">
       <header className="topbar">
@@ -89,14 +135,15 @@ export function RoomScreen({ invite, displayName, onLeave }: Props) {
       )}
       {s.role === "expert" && (
         <div className="banner warn">
-          You opened an <strong>expert invite</strong> in the browser. The browser is view-only; editing happens in the Blender add-on.
-          Don’t share this link with family.
+          You opened an <strong>expert invite</strong> in the browser. Editing happens in the Blender add-on; here you can talk to the novice
+          with push-to-talk voice notes (Discussion). Don’t share this link with observers.
         </div>
       )}
 
       <div className="layout">
         <section className="stage">
           <PreviewPanel client={client} />
+          <LessonBanner lesson={s.lesson} objects={s.objects} hostName={s.room?.hostName ?? "the novice"} />
           {caption && (
             <div className={`caption ${caption.tone}`} role="status" aria-live="polite">
               <strong>{caption.title}</strong>
@@ -124,6 +171,16 @@ export function RoomScreen({ invite, displayName, onLeave }: Props) {
             canSend={s.connection === "connected"}
             onSend={(text) => client.send("comment.add", { objectId: selected, text })}
             onClearSelection={() => select(null)}
+            playing={playing}
+            onPlay={(c) => void play(c)}
+            voice={
+              <>
+                {s.role === "expert" && <PushToTalk disabled={s.connection !== "connected"} localLink={localLink} onSend={sendVoice} />}
+                <label className="small muted autoplay">
+                  <input type="checkbox" checked={autoPlay} onChange={(e) => setAutoPlay(e.target.checked)} /> Play new voice notes automatically
+                </label>
+              </>
+            }
           />
           <DevPanel client={client} />
         </aside>

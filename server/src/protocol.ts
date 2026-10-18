@@ -73,6 +73,11 @@ const objectPatchSchema = objectInputSchema.omit({ id: true, kind: true }).parti
 export type ObjectPatch = z.infer<typeof objectPatchSchema>;
 
 const axis = z.enum(["x", "y", "z"]);
+const poseSchema = z.strictObject({ position: vec3, rotation: quat, dimensions: vec3 });
+
+/** Teaching prompts the expert can send; see PROTOCOL.md "Lessons". */
+export const LESSON_PRESETS = ["scan", "move", "rotate", "scale", "place", "custom"] as const;
+export type LessonPreset = (typeof LESSON_PRESETS)[number];
 
 const payloadSchemas = {
   auth: z.strictObject({
@@ -101,7 +106,18 @@ const payloadSchemas = {
   "comment.add": z.strictObject({
     objectId: z.union([z.null(), z.string().regex(UUID_RE)]),
     text: z.string().trim().min(1).max(500),
+    /** A push-to-talk clip uploaded with POST /api/rooms/:roomId/voice (host and expert only). */
+    voice: z.strictObject({ clipId: shortId, durationMs: z.number().int().min(1).max(60_000) }).optional(),
   }),
+  "lesson.prompt": z.strictObject({
+    preset: z.enum(LESSON_PRESETS),
+    text: z.string().trim().min(1).max(200),
+    objectId: z.union([z.null(), z.string().regex(UUID_RE)]).optional(),
+    kind: z.union([z.null(), z.enum(OBJECT_KINDS)]).optional(),
+    demo: z.union([z.null(), z.strictObject({ from: poseSchema, to: poseSchema })]).optional(),
+  }),
+  "lesson.done": z.strictObject({ lessonId: shortId }),
+  "lesson.clear": z.strictObject({ lessonId: shortId }),
   "reaction.toggle": z.strictObject({
     objectId: z.string().regex(UUID_RE),
     kind: z.enum(["like", "discuss"]),
@@ -140,6 +156,7 @@ export const EPOCH_BOUND: ReadonlySet<ClientType> = new Set<ClientType>([
   "guidance.set",
   "guidance.begin",
   "guidance.attempt",
+  "lesson.prompt",
 ]);
 
 export const PERMISSIONS: Record<ClientType, readonly Role[]> = {
@@ -162,6 +179,9 @@ export const PERMISSIONS: Record<ClientType, readonly Role[]> = {
   "object.delete": ["expert", "host"],
   "proposal.accept": ["expert"],
   "proposal.reject": ["expert"],
+  "lesson.prompt": ["expert"],
+  "lesson.clear": ["expert"],
+  "lesson.done": ["host"],
   "guidance.set": ["expert"],
   "guidance.begin": ["expert"],
   "guidance.approve": ["expert"],

@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import bpy
 
-from . import catalog, coords, primitives, protocol, scan_format
+from . import catalog, coords, lessons, primitives, protocol, scan_format
 from .session import RoomSession
 from .tracker import SyncTracker
 
@@ -48,6 +48,7 @@ class Controller:
         self.approving_object = ""
         self.last_info = ""
         self.proposal_log: List[Dict[str, Any]] = []
+        self.lesson: Optional[Dict[str, Any]] = None
         self.floor_z = 0.0
         self.foreign_objects = 0
 
@@ -249,6 +250,11 @@ def _handle(s: RoomSession, msg: Dict[str, Any]) -> None:
     elif t == "guidance.state":
         ctrl.guidance = p["guidance"]
         _sync_guidance_objects()
+    elif t == "lesson.state":
+        prev = ctrl.lesson
+        ctrl.lesson = p.get("lesson")
+        if ctrl.lesson and ctrl.lesson["state"] == "done" and (not prev or prev.get("state") != "done"):
+            ctrl.last_info = f"The novice finished: “{ctrl.lesson['text'][:60]}”"
     elif t == "scan.ready":
         ctrl.scan_meta = p["scan"]
         _maybe_fetch_scan(s)
@@ -302,6 +308,7 @@ def _apply_snapshot(s: RoomSession, p: Dict[str, Any]) -> None:
     for o in p["objects"]:
         _set_stale_display(o)
     ctrl.guidance = p.get("guidance")
+    ctrl.lesson = p.get("lesson")
     ctrl.last_target_sig = None
     _sync_guidance_objects()
     ctrl.scan_meta = p.get("scan")
@@ -720,6 +727,30 @@ def proposal_command(msg_type: str, oid: str, note: str = "") -> str:
     s.send(msg_type, payload)
     verb = "Accepted" if msg_type == "proposal.accept" else "Rejected"
     return f"{verb} {o['proposal']['byName']}’s “{o['name']}”"
+
+
+def send_lesson(preset: str, design_obj: Optional[bpy.types.Object], **options: Any) -> str:
+    """Send a teaching prompt; move/rotate/scale demonstrate on the selected design object."""
+    s = ctrl.session
+    if s is None:
+        return "Not connected"
+    obj = None
+    if design_obj is not None and "rb_id" in design_obj:
+        obj = ctrl.server_objects.get(design_obj["rb_id"])
+    try:
+        payload = lessons.build(preset, obj, **options)
+    except ValueError as exc:
+        return str(exc)
+    s.send("lesson.prompt", payload, origin_epoch=ctrl.origin_epoch)
+    return f"Prompt sent: {payload['text'][:60]}"
+
+
+def clear_lesson() -> str:
+    s = ctrl.session
+    if s is None or ctrl.lesson is None:
+        return "No prompt to clear"
+    s.send("lesson.clear", {"lessonId": ctrl.lesson["id"]})
+    return "Prompt cleared"
 
 
 def guidance_command(msg_type: str) -> str:

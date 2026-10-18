@@ -21,7 +21,7 @@ enum Theme {
         switch r {
         case .host: return "Novice (phone)"
         case .expert: return "Expert (Blender)"
-        case .viewer: return "Family (viewer)"
+        case .viewer: return "Observer (learner)"
         }
     }
 }

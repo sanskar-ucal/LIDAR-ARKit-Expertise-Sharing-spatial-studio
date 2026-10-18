@@ -11,9 +11,9 @@ from urllib.parse import urlsplit
 import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, PointerProperty, StringProperty
 
-from . import catalog, coords, protocol, sync
+from . import catalog, coords, lessons, protocol, sync
 
-ROLE_LABEL = {"host": "Host (phone)", "expert": "Expert", "viewer": "Family"}
+ROLE_LABEL = {"host": "Novice (phone)", "expert": "Expert", "viewer": "Observer"}
 
 
 def _addon_prefs():
@@ -79,6 +79,24 @@ class RBSettings(bpy.types.PropertyGroup):
     tolerance: FloatProperty(name="Tolerance", default=0.05, min=0.01, max=0.5, unit="LENGTH", precision=3)
     status_message: StringProperty(default="")
     proposal_note: StringProperty(name="Note", description="Optional feedback sent to the novice with Accept or Reject", maxlen=300)
+    lesson_preset: EnumProperty(
+        name="Prompt",
+        items=[
+            ("scan", "Scan the room", "Ask the novice to scan the whole room (completes when the scan arrives)"),
+            ("place", "Place a piece", "Ask the novice to propose a piece from the phone's library (completes when they do)"),
+            ("move", "Show: move (G)", "Loop a ghost of the selected object moving along one axis on the phone"),
+            ("rotate", "Show: rotate (R Z)", "Loop a ghost of the selected object turning on the phone"),
+            ("scale", "Show: scale (S)", "Loop a ghost of the selected object growing along one axis on the phone"),
+            ("custom", "Custom task", "Your own instruction"),
+        ],
+        default="scan",
+    )
+    lesson_axis: EnumProperty(name="Axis", items=[("X", "X (red)", ""), ("Y", "Y (green)", ""), ("Z", "Z (blue)", "")], default="X")
+    lesson_distance: FloatProperty(name="Distance", default=0.5, min=-5, max=5, unit="LENGTH", precision=2)
+    lesson_angle: FloatProperty(name="Angle (°)", default=90, min=-180, max=180, precision=0)
+    lesson_factor: FloatProperty(name="Factor", default=1.25, min=0.2, max=4, precision=2)
+    lesson_kind: EnumProperty(name="Piece", items=[(k["kind"], k["label"], "") for k in catalog.DATA["kinds"]], default="chair")
+    lesson_text: StringProperty(name="Text", description="Leave empty for a ready-made instruction", maxlen=200)
 
 
 class RBPreferences(bpy.types.AddonPreferences):
@@ -217,6 +235,38 @@ class ROOMBRIDGE_OT_proposal(bpy.types.Operator):
         st.proposal_note = ""
         st.status_message = msg
         self.report({"INFO"}, msg)
+        return {"FINISHED"}
+
+
+class ROOMBRIDGE_OT_send_lesson(bpy.types.Operator):
+    bl_idname = "roombridge.send_lesson"
+    bl_label = "Send Prompt"
+    bl_description = "Show this prompt on the novice's phone; demos loop a ghost of the selected object"
+
+    @classmethod
+    def poll(cls, _context):
+        return sync.is_connected()
+
+    def execute(self, context):
+        st = _settings(context)
+        design = _design_for(context) if st.lesson_preset in lessons.NEEDS_OBJECT else None
+        msg = sync.send_lesson(st.lesson_preset, design, axis=st.lesson_axis, distance=st.lesson_distance,
+                               angle=st.lesson_angle, factor=st.lesson_factor, kind=st.lesson_kind, text=st.lesson_text)
+        st.status_message = msg
+        self.report({"INFO"} if msg.startswith("Prompt sent") else {"WARNING"}, msg)
+        return {"FINISHED"}
+
+
+class ROOMBRIDGE_OT_clear_lesson(bpy.types.Operator):
+    bl_idname = "roombridge.clear_lesson"
+    bl_label = "Clear Prompt"
+
+    @classmethod
+    def poll(cls, _context):
+        return sync.is_connected() and sync.ctrl.lesson is not None
+
+    def execute(self, context):
+        _settings(context).status_message = sync.clear_lesson()
         return {"FINISHED"}
 
 
@@ -481,6 +531,52 @@ class ROOMBRIDGE_PT_proposals(_Base, bpy.types.Panel):
                 col.label(text=f"{label}: {r['objectName']}" + (f" — “{r['note'][:40]}”" if r.get("note") else ""), icon=icon)
 
 
+LESSON_STATE = {"open": ("Waiting for the novice", "TIME"), "done": ("Novice says done", "CHECKMARK")}
+
+
+class ROOMBRIDGE_PT_teach(_Base, bpy.types.Panel):
+    bl_label = "Teach (Prompts & Show Me)"
+    bl_parent_id = "ROOMBRIDGE_PT_main"
+
+    @classmethod
+    def poll(cls, _context):
+        return sync.ctrl.session is not None
+
+    def draw(self, context):
+        st = _settings(context)
+        c = sync.ctrl
+        layout = self.layout
+        col = layout.column(align=True)
+        col.prop(st, "lesson_preset")
+        if st.lesson_preset in lessons.NEEDS_OBJECT:
+            design = _design_for(context)
+            col.label(text=f"Demonstrate on: {design.name}" if design else "Select a design object to demonstrate on",
+                      icon="OBJECT_DATA" if design else "ERROR")
+            col.prop(st, "lesson_axis")
+            if st.lesson_preset == "move":
+                col.prop(st, "lesson_distance")
+            elif st.lesson_preset == "rotate":
+                col.label(text="Turns around Z (blue, vertical)")
+                col.prop(st, "lesson_angle")
+            else:
+                col.prop(st, "lesson_factor")
+        elif st.lesson_preset == "place":
+            col.prop(st, "lesson_kind")
+        col.prop(st, "lesson_text")
+        layout.operator("roombridge.send_lesson", icon="PLAY")
+        lesson = c.lesson
+        if lesson is None:
+            layout.label(text="No prompt on the phone.")
+            return
+        box = layout.box()
+        label, icon = LESSON_STATE.get(lesson["state"], (lesson["state"], "DOT"))
+        box.label(text=f"{label}:", icon=icon)
+        box.label(text=f"“{lesson['text'][:70]}”")
+        if lesson.get("demo"):
+            box.label(text="The phone loops a ghost demo when the novice taps Show me.", icon="GHOST_ENABLED")
+        layout.operator("roombridge.clear_lesson", icon="X")
+
+
 class ROOMBRIDGE_PT_guidance(_Base, bpy.types.Panel):
     bl_label = "Guide the Novice"
     bl_parent_id = "ROOMBRIDGE_PT_main"
@@ -538,8 +634,13 @@ class ROOMBRIDGE_PT_discussion(_Base, bpy.types.Panel):
             about = ""
             if k.get("objectName"):
                 about = f" on {k['objectName']}" + (" (deleted)" if k.get("objectDeleted") else "")
-            col.label(text=f"{k['authorName']}{about}:", icon="COMMUNITY")
+            voice = k.get("voice")
+            spoken = f" (voice note, {voice['durationMs'] / 1000:.0f} s)" if voice else ""
+            col.label(text=f"{k['authorName']}{about}{spoken}:", icon="PLAY_SOUND" if voice else "COMMUNITY")
             col.label(text=f"   {k['text'][:80]}")
+        col.separator()
+        col.label(text="To talk: open the expert invite in a browser on this Mac", icon="INFO")
+        col.label(text="(use localhost) and hold the mic button.")
 
 
 class ROOMBRIDGE_PT_debug(_Base, bpy.types.Panel):
@@ -571,12 +672,15 @@ CLASSES = (
     ROOMBRIDGE_OT_reimport_scan,
     ROOMBRIDGE_OT_replace_stale,
     ROOMBRIDGE_OT_proposal,
+    ROOMBRIDGE_OT_send_lesson,
+    ROOMBRIDGE_OT_clear_lesson,
     ROOMBRIDGE_OT_select_object,
     ROOMBRIDGE_PT_main,
     ROOMBRIDGE_PT_people,
     ROOMBRIDGE_PT_room,
     ROOMBRIDGE_PT_design,
     ROOMBRIDGE_PT_proposals,
+    ROOMBRIDGE_PT_teach,
     ROOMBRIDGE_PT_guidance,
     ROOMBRIDGE_PT_discussion,
     ROOMBRIDGE_PT_debug,

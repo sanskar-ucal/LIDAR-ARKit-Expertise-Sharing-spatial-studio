@@ -3,6 +3,7 @@ import { describe, poseOf, type Step } from "./narrator";
 import type {
   Comment,
   Guidance,
+  Lesson,
   ObjectPose,
   Participant,
   PreviewStatus,
@@ -30,6 +31,8 @@ export interface FeedItem {
   at: number;
   /** Set on edit items so later updates of the same drag can be merged into one caption. */
   edit?: { name: string; before: ObjectPose; after: ObjectPose };
+  /** Replaces "actor + first step" as the headline (prompts, voice notes); steps become details. */
+  title?: string;
 }
 
 const MAX_FEED = 30;
@@ -44,6 +47,7 @@ export interface RoomState {
   participants: Participant[];
   objects: SceneObject[];
   guidance: Guidance | null;
+  lesson: Lesson | null;
   comments: Comment[];
   reactions: Record<string, Reactions>;
   scan: ScanMeta | null;
@@ -62,6 +66,7 @@ export const initialState: RoomState = {
   participants: [],
   objects: [],
   guidance: null,
+  lesson: null,
   comments: [],
   reactions: {},
   scan: null,
@@ -103,6 +108,48 @@ function narrateUpdate(s: RoomState, m: ServerMessage, prev: SceneObject, o: Sce
     at,
     edit: { name: o.name, before: poseOf(prev), after: poseOf(o) },
   });
+}
+
+/** The CAD steps a prompt teaches, in Blender keys. */
+export function lessonSteps(l: Lesson, objects: SceneObject[]): Step[] {
+  if (l.demo) return describe(objects.find((o) => o.id === l.objectId)?.name ?? "it", l.demo.from, l.demo.to);
+  if (l.preset === "place" && l.kind) {
+    const info = kindInfo(l.kind);
+    return [{ concept: "add", text: `add a ${(info?.label ?? l.kind).toLowerCase()}`, shortcut: info?.blender ?? "" }];
+  }
+  return [];
+}
+
+function narrateLesson(s: RoomState, m: ServerMessage, l: Lesson | null): FeedItem[] {
+  const prev = s.lesson;
+  const host = s.room?.hostName ?? "The novice";
+  if (l && l.state === "open" && prev?.id !== l.id) {
+    return pushFeed(s.feed, {
+      id: m.messageId,
+      actorId: m.clientId,
+      actor: l.byName,
+      objectId: l.objectId ?? "",
+      steps: lessonSteps(l, s.objects),
+      note: null,
+      tone: "info",
+      at: l.createdAt,
+      title: `${l.byName} asks ${host}: ${l.text}`,
+    });
+  }
+  if (l && l.state === "done" && prev?.id === l.id && prev.state === "open") {
+    return pushFeed(s.feed, {
+      id: m.messageId,
+      actorId: m.clientId,
+      actor: host,
+      objectId: l.objectId ?? "",
+      steps: [],
+      note: null,
+      tone: "success",
+      at: l.doneAt ?? Date.now(),
+      title: `${host} finished: ${l.text}`,
+    });
+  }
+  return s.feed;
 }
 
 function narrateResolution(s: RoomState, m: ServerMessage, r: ProposalResolved): FeedItem[] {
@@ -147,6 +194,7 @@ export function reduce(s: RoomState, m: ServerMessage): RoomState {
         participants: p.participants,
         objects: p.objects,
         guidance: p.guidance ?? null,
+        lesson: p.lesson ?? null,
         comments: (p.comments as Comment[]).slice(-MAX_COMMENTS),
         reactions: p.reactions ?? {},
         scan: p.scan ?? null,
@@ -209,8 +257,30 @@ export function reduce(s: RoomState, m: ServerMessage): RoomState {
     case "presence":
       next = { ...s, participants: p.participants };
       break;
-    case "comment.added":
-      next = s.comments.some((c) => c.id === p.comment.id) ? s : { ...s, comments: [...s.comments, p.comment].slice(-MAX_COMMENTS) };
+    case "comment.added": {
+      const c = p.comment as Comment;
+      if (s.comments.some((x) => x.id === c.id)) {
+        next = s;
+        break;
+      }
+      const feed = c.voice
+        ? pushFeed(s.feed, {
+            id: m.messageId,
+            actorId: c.authorId,
+            actor: c.authorName,
+            objectId: c.objectId ?? "",
+            steps: [],
+            note: null,
+            tone: "info",
+            at: c.createdAt,
+            title: `🎤 ${c.authorName}: ${c.text}`,
+          })
+        : s.feed;
+      next = { ...s, comments: [...s.comments, c].slice(-MAX_COMMENTS), feed };
+      break;
+    }
+    case "lesson.state":
+      next = { ...s, lesson: p.lesson ?? null, feed: narrateLesson(s, m, p.lesson ?? null) };
       break;
     case "reaction.updated":
       next = { ...s, reactions: { ...s.reactions, [p.objectId]: { like: p.like, discuss: p.discuss } } };

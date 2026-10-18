@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ROLE_LABEL, type Comment, type SceneObject } from "../protocol";
 
 interface Props {
@@ -7,9 +7,13 @@ interface Props {
   canSend: boolean;
   onSend(text: string): boolean;
   onClearSelection(): void;
+  playing: string | null;
+  onPlay(c: Comment): void;
+  /** Push-to-talk, for the expert's browser. */
+  voice?: ReactNode;
 }
 
-export function Comments({ comments, selected, canSend, onSend, onClearSelection }: Props) {
+export function Comments({ comments, selected, canSend, onSend, onClearSelection, playing, onPlay, voice }: Props) {
   const [draft, setDraft] = useState("");
   const list = selected ? comments.filter((c) => c.objectId === selected.id) : comments;
   const end = useRef<HTMLLIElement>(null);
@@ -49,11 +53,17 @@ export function Comments({ comments, selected, canSend, onSend, onClearSelection
                 </span>
               )}
             </div>
-            <p>{c.text}</p>
+            {c.voice && (
+              <button className="react" onClick={() => onPlay(c)} aria-label={`Play voice note from ${c.authorName}`}>
+                {playing === c.voice.clipId ? "■ Stop" : `▶ Voice note · ${Math.max(1, Math.round(c.voice.durationMs / 1000))} s`}
+              </button>
+            )}
+            <p>{c.voice ? `🎤 ${c.text}` : c.text}</p>
           </li>
         ))}
         <li ref={end} aria-hidden />
       </ul>
+      {voice}
       <form onSubmit={submit} className="composer">
         <input
           value={draft}

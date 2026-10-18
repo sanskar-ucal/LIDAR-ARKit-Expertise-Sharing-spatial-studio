@@ -78,6 +78,26 @@ final class SceneRenderer {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: "Show me" demo
+
+    private var demo: ObjectNode?
+
+    /// The expert's demonstration: a translucent ghost of the object, animated by the caller.
+    func showDemo(_ o: SceneObject?, label: String) {
+        guard let o else {
+            demo?.entity.removeFromParent()
+            demo = nil
+            return
+        }
+        let node = demo ?? {
+            let n = ObjectNode(style: .target)
+            root.addChild(n.entity)
+            demo = n
+            return n
+        }()
+        node.update(object: o, label: label, dimmed: false)
+    }
+
     // MARK: Placement preview
 
     /// Translucent preview of the object the novice is about to propose, at the crosshair.

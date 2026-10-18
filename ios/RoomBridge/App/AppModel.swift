@@ -1,4 +1,5 @@
 import ARKit
+import AVFoundation
 import Observation
 import RoomBridgeCore
 import SwiftUI
@@ -71,6 +72,22 @@ final class AppModel {
     @ObservationIgnored private var drafts: [String: SceneObject] = [:]
     @ObservationIgnored private var proposalInFlight: [String: String] = [:]  // objectId -> messageId
     @ObservationIgnored private var proposalDirty: Set<String> = []
+
+    // MARK: Expert prompts ("lessons") and voice notes
+    private(set) var lesson: Lesson?
+    private(set) var showingDemo = false
+    var lessonCollapsed = false
+    private(set) var recording = false
+    private(set) var recordingStarted: Date?
+    private(set) var voiceStatus: String?
+    private(set) var playingClipId: String?
+    @ObservationIgnored private var demoTimer: Timer?
+    @ObservationIgnored private var demoStart: TimeInterval = 0
+    @ObservationIgnored private let recorder = VoiceRecorder()
+    @ObservationIgnored private var wantsRecording = false
+    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var clipCache: [String: Data] = [:]
+    @ObservationIgnored private var heardClips: Set<String> = []
 
     // MARK: Developer diagnostics
     private(set) var previewFps: Double = 0
@@ -202,6 +219,9 @@ final class AppModel {
         placingKind = nil; placementReady = false; placementPose = nil; editingProposalId = nil
         learnFeed = []; toast = nil; skillsSeen = []; narration = EditNarrationBuffer(settle: 0.8)
         drafts = [:]; proposalInFlight = [:]; proposalDirty = []
+        lesson = nil; showingDemo = false; lessonCollapsed = false; demoTimer?.invalidate(); demoTimer = nil
+        recording = false; recordingStarted = nil; voiceStatus = nil; playingClipId = nil; wantsRecording = false
+        player = nil; clipCache = [:]; heardClips = []
     }
 
     /// Leaves the room locally. The host's room stays open until it expires or is ended.
@@ -219,6 +239,9 @@ final class AppModel {
         diagTimer?.invalidate(); diagTimer = nil
         narrationTimer?.invalidate(); narrationTimer = nil
         toastTask?.cancel(); toastTask = nil
+        demoTimer?.invalidate(); demoTimer = nil
+        _ = recorder.stop()
+        player?.stop(); player = nil
         broadcaster?.stop(); broadcaster = nil
         preview.shutdown()
         control?.stop(); control = nil
@@ -264,6 +287,8 @@ final class AppModel {
             scan = s.scan
             previewStatus = s.preview
             applyGuidance(s.guidance)
+            applyLesson(s.lesson)
+            heardClips.formUnion(s.comments.compactMap { $0.voice?.clipId })  // don't replay history on reconnect
             if awaitingOriginReset && s.room.originEpoch > resetFromEpoch {
                 awaitingOriginReset = false
                 scanFrozen = false
@@ -281,10 +306,15 @@ final class AppModel {
             removeObject(id, from: header.clientId)
         case .proposalResolved(let r):
             resolved(r)
+        case .lesson(let l):
+            applyLesson(l)
         case .presence(let p):
             participants = p
         case .commentAdded(let c):
-            if !comments.contains(where: { $0.id == c.id }) { comments.append(c) }
+            if !comments.contains(where: { $0.id == c.id }) {
+                comments.append(c)
+                if c.voice != nil { voiceNoteArrived(c) }
+            }
         case .reactionUpdated(let id, let r):
             reactions[id] = r
         case .guidance(let g):
@@ -796,5 +826,195 @@ extension AppModel {
         control?.send("object.delete", ObjectIdPayload(id: o.id))
         editingProposalId = nil
         push(LearnItem(actor: "You", steps: [Narrator.deleted(name: o.name)], tone: .info))
+    }
+}
+
+// MARK: - Expert prompts with "show me" demos
+
+extension AppModel {
+    var lessonObject: SceneObject? { lesson?.objectId.flatMap { id in objects.first { $0.id == id } } }
+
+    /// The CAD steps a prompt demonstrates, in Blender keys.
+    var lessonSteps: [NarrationStep] {
+        guard let l = lesson else { return [] }
+        if let d = l.demo { return Narrator.describe(name: lessonObject?.name ?? "it", before: d.from, after: d.to) }
+        if l.preset == .place, let k = l.kind {
+            let spec = AppCatalog.kind(k)
+            return [Narrator.added(name: "a \(spec.label.lowercased())", blender: spec.blender)]
+        }
+        return []
+    }
+
+    private func applyLesson(_ l: Lesson?) {
+        let previous = lesson
+        lesson = l
+        guard let l else {
+            stopDemo()
+            return
+        }
+        if previous?.id != l.id {
+            stopDemo()
+            lessonCollapsed = false
+            if l.state == .open {
+                push(LearnItem(actor: l.byName, steps: lessonSteps, tone: .info, title: "\(l.byName) asks: \(l.text)"))
+            }
+        } else if previous?.state == .open && l.state == .done {
+            stopDemo()
+            push(LearnItem(actor: "You", steps: [], tone: .success, title: "Done: \(l.text)"))
+        }
+    }
+
+    func toggleDemo() {
+        if showingDemo {
+            stopDemo()
+            return
+        }
+        guard lesson?.demo != nil, lessonObject != nil else { return }
+        showingDemo = true
+        demoStart = CACurrentMediaTime()
+        demoTimer?.invalidate()
+        demoTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.demoTick() }
+        }
+        demoTick()
+    }
+
+    private func stopDemo() {
+        demoTimer?.invalidate()
+        demoTimer = nil
+        showingDemo = false
+        ar?.renderer.showDemo(nil, label: "")
+    }
+
+    /// Loops: hold at the start, glide to the end, hold, repeat. Not realistic, just clear.
+    private func demoTick() {
+        guard let l = lesson, let d = l.demo, var o = lessonObject else {
+            stopDemo()
+            return
+        }
+        let cycle = 3.0
+        let t = (CACurrentMediaTime() - demoStart).truncatingRemainder(dividingBy: cycle)
+        let raw = min(max((t - 0.5) / 1.5, 0), 1)
+        let k = raw * raw * (3 - 2 * raw)  // ease in-out
+        o.position = d.from.position + (d.to.position - d.from.position) * k
+        o.dimensions = d.from.dimensions + (d.to.dimensions - d.from.dimensions) * k
+        o.rotation = simd_slerp(simd_quatd(vector: d.from.rotation), simd_quatd(vector: d.to.rotation), k).vector
+        let keys = lessonSteps.first?.shortcut ?? ""
+        ar?.renderer.showDemo(o, label: keys.isEmpty ? "SHOW ME" : "SHOW ME\n\(keys)")
+    }
+
+    func markLessonDone() {
+        guard let l = lesson, l.state == .open else { return }
+        control?.send("lesson.done", LessonIdPayload(lessonId: l.id))
+    }
+
+    func startLessonPlacement() {
+        guard let k = lesson?.kind else { return }
+        lessonCollapsed = true
+        beginPlacement(k)
+    }
+}
+
+// MARK: - Push-to-talk voice notes
+
+extension AppModel {
+    /// Hold to talk. Release sends the clip with an on-device transcript to everyone in the room.
+    func beginTalk() {
+        guard !recording, !wantsRecording, voiceStatus == nil, isConnected else { return }
+        wantsRecording = true
+        player?.stop()
+        Task {
+            let ok = await recorder.start()
+            guard wantsRecording else {
+                _ = recorder.stop()  // released before the microphone was ready
+                return
+            }
+            if ok {
+                recording = true
+                recordingStarted = Date()
+                Haptics.light()
+            } else {
+                wantsRecording = false
+                lastError = "Microphone access is off. Allow it in Settings › RoomBridge to send voice notes."
+            }
+        }
+    }
+
+    func endTalk() {
+        wantsRecording = false
+        guard recording else { return }
+        recording = false
+        recordingStarted = nil
+        guard let clip = recorder.stop() else { return }
+        guard clip.durationMs >= 400 else {
+            try? FileManager.default.removeItem(at: clip.url)
+            lastError = "Hold the mic button while you talk"
+            return
+        }
+        Haptics.light()
+        sendVoice(clip.url, durationMs: clip.durationMs)
+    }
+
+    private func sendVoice(_ url: URL, durationMs: Int) {
+        guard let api, let created else { return }
+        let objectId = selectedObjectId
+        voiceStatus = "Transcribing on this iPhone…"
+        Task {
+            defer { try? FileManager.default.removeItem(at: url) }
+            let transcript = await Transcriber.transcribe(url)
+            voiceStatus = "Sending…"
+            do {
+                let data = try Data(contentsOf: url)
+                let clipId = try await api.uploadVoice(roomId: created.roomId, token: created.hostToken, audio: data, mime: VoiceRecorder.mime)
+                heardClips.insert(clipId)
+                let text = transcript.flatMap { $0.isEmpty ? nil : String($0.prefix(500)) } ?? "(voice note)"
+                control?.send("comment.add", CommentPayload(objectId: objectId, text: text, voice: .init(clipId: clipId, durationMs: durationMs)))
+                voiceStatus = nil
+            } catch let e as APIError {
+                voiceStatus = nil
+                lastError = "Voice note not sent: \(e.message)"
+            } catch {
+                voiceStatus = nil
+                lastError = "Voice note not sent: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// The expert's notes play straight away, like a walkie-talkie; everyone also gets the text.
+    private func voiceNoteArrived(_ c: Comment) {
+        guard let v = c.voice, c.authorId != clientId, !heardClips.contains(v.clipId) else { return }
+        heardClips.insert(v.clipId)
+        push(LearnItem(actor: c.authorName, steps: [], note: nil, tone: .info, title: "🎤 \(c.authorName): \(c.text)"))
+        if !recording { play(c) }
+    }
+
+    func play(_ c: Comment) {
+        guard let v = c.voice, let api, let created else { return }
+        if playingClipId == v.clipId {
+            player?.stop()
+            playingClipId = nil
+            return
+        }
+        Task {
+            do {
+                let data: Data
+                if let cached = clipCache[v.clipId] {
+                    data = cached
+                } else {
+                    data = try await api.downloadVoice(roomId: created.roomId, token: created.hostToken, clipId: v.clipId)
+                    clipCache[v.clipId] = data
+                }
+                try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothA2DP])
+                let p = try AVAudioPlayer(data: data)
+                player = p
+                playingClipId = v.clipId
+                p.play()
+                let length = p.duration
+                try? await Task.sleep(for: .seconds(length + 0.2))
+                if playingClipId == v.clipId { playingClipId = nil }
+            } catch {
+                lastError = "Couldn’t play the voice note"
+            }
+        }
     }
 }

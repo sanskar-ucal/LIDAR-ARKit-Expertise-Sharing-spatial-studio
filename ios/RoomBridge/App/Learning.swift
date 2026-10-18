@@ -13,14 +13,20 @@ struct LearnItem: Identifiable, Equatable {
     /// Concepts met for the first time; their tips are shown with this item.
     var newConcepts: [CADConcept] = []
     var date = Date()
+    /// Overrides the headline (prompts and voice notes); then every step is a detail line.
+    var title: String? = nil
 
     var headline: String {
+        if let title { return title }
         guard let first = steps.first else { return actor }
         return "\(actor) \(first.text)"
     }
 
-    /// Steps after the first, shown as smaller lines.
-    var details: [NarrationStep] { Array(steps.dropFirst()) }
+    /// The step whose keys are shown under the headline.
+    var leadStep: NarrationStep? { title == nil ? steps.first : nil }
+
+    /// Steps shown as smaller lines.
+    var details: [NarrationStep] { title == nil ? Array(steps.dropFirst()) : steps }
 }
 
 /// Edits the novice can make to their own proposal from the phone.
