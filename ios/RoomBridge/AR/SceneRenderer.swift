@@ -11,12 +11,16 @@ final class SceneRenderer {
         var selectedBy: [String] = []
         var commentCount = 0
         var role: Role? = nil
+        /// The novice's own proposal, waiting for the expert.
+        var mineProposal = false
+        var editing = false
     }
 
     private let root = AnchorEntity(world: .zero)
     private var objects: [String: ObjectNode] = [:]
     private var target: ObjectNode?
     private var attempt: ObjectNode?
+    private var placement: ObjectNode?
     private var axisLine: Entity?
     private var axisKey = ""
     private var distanceLabel: Entity?
@@ -42,7 +46,8 @@ final class SceneRenderer {
                 return n
             }()
             let dimmed = guidance?.objectId == obj.id && guidance?.state == .active
-            node.update(object: obj, label: label(for: obj, decor: decor[obj.id] ?? ObjectDecor(), guidance: guidance), dimmed: dimmed)
+            node.update(object: obj, label: label(for: obj, decor: decor[obj.id] ?? ObjectDecor(), guidance: guidance), dimmed: dimmed,
+                        pending: obj.proposal != nil)
             // Objects from a previous AR origin are not drawn: their coordinates are meaningless now.
             node.entity.isEnabled = !obj.stale
         }
@@ -52,9 +57,14 @@ final class SceneRenderer {
     private func label(for o: SceneObject, decor: ObjectDecor, guidance: Guidance?) -> String {
         var lines = [o.name]
         let d = o.dimensions
-        switch o.kind {
-        case .pillar: lines.append(String(format: "Ø %.2f m × %.2f m tall", d.x, d.y))
-        default: lines.append(String(format: "%.2f × %.2f × %.2f m", d.x, d.y, d.z))
+        if AppCatalog.kind(o.kind).round {
+            lines.append(String(format: "Ø %.2f m × %.2f m tall", d.x, d.y))
+        } else {
+            lines.append(String(format: "%.2f × %.2f × %.2f m", d.x, d.y, d.z))
+        }
+        if let p = o.proposal {
+            lines.insert(decor.mineProposal ? (decor.editing ? "YOUR PROPOSAL · editing" : "YOUR PROPOSAL · waiting for the expert")
+                                            : "PROPOSED BY \(p.byName.uppercased())", at: 0)
         }
         if let g = guidance, g.objectId == o.id {
             switch g.state {
@@ -66,6 +76,24 @@ final class SceneRenderer {
         if decor.commentCount > 0 { lines.append("\(decor.commentCount) comment\(decor.commentCount == 1 ? "" : "s")") }
         if !decor.selectedBy.isEmpty { lines.append("Looking: " + decor.selectedBy.joined(separator: ", ")) }
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: Placement preview
+
+    /// Translucent preview of the object the novice is about to propose, at the crosshair.
+    func showPlacement(_ o: SceneObject?, label: String) {
+        guard let o else {
+            placement?.entity.removeFromParent()
+            placement = nil
+            return
+        }
+        let node = placement ?? {
+            let n = ObjectNode(style: .placement)
+            root.addChild(n.entity)
+            placement = n
+            return n
+        }()
+        node.update(object: o, label: label, dimmed: false)
     }
 
     // MARK: Guidance layer
@@ -134,7 +162,7 @@ final class SceneRenderer {
             root.addChild(l)
             distanceLabel = l
         }
-        let top = Float(object.kind == .panel ? object.dimensions.y / 2 : object.dimensions.y)
+        let top = Float(AppCatalog.kind(object.kind).top(object.dimensions))
         distanceLabel?.position = SIMD3<Float>(a.position) + SIMD3<Float>(0, top + 0.45, 0)
     }
 
@@ -192,7 +220,8 @@ final class SceneRenderer {
 /// One rendered primitive with its label. Mesh is rebuilt only when kind/size/look change.
 @MainActor
 final class ObjectNode {
-    enum Style { case proposal, target, attempt }
+    /// `.proposal` is a normal design object ("the expert's proposal" for the room).
+    enum Style { case proposal, target, attempt, placement }
 
     let entity = Entity()
     private let style: Style
@@ -205,13 +234,13 @@ final class ObjectNode {
         self.style = style
     }
 
-    func update(object o: SceneObject, label text: String, dimmed: Bool) {
+    func update(object o: SceneObject, label text: String, dimmed: Bool, pending: Bool = false) {
         entity.position = SIMD3<Float>(o.position)
         entity.orientation = Coordinates.simdQuatf(o.rotation)
-        let key = "\(o.kind)|\(o.dimensions)|\(o.color)|\(o.textureRef ?? "")|\(dimmed)"
+        let key = "\(o.kind)|\(o.dimensions)|\(o.color)|\(o.textureRef ?? "")|\(dimmed)|\(pending)"
         if key != modelKey {
             model?.removeFromParent()
-            let m = Self.makeModel(o, style: style, dimmed: dimmed)
+            let m = Self.makeModel(o, style: style, opacity: dimmed ? 0.35 : (pending ? 0.7 : 1))
             entity.addChild(m)
             model = m
             modelKey = key
@@ -220,7 +249,7 @@ final class ObjectNode {
             label?.removeFromParent()
             let color: UIColor
             switch style {
-            case .proposal: color = .white
+            case .proposal, .placement: color = .white
             case .target: color = UIColor(red: 0.55, green: 0.9, blue: 0.92, alpha: 1)
             case .attempt: color = UIColor(red: 1, green: 0.78, blue: 0.5, alpha: 1)
             }
@@ -229,12 +258,12 @@ final class ObjectNode {
             label = l
             labelText = text
         }
-        let top = Float(o.kind == .panel ? o.dimensions.y / 2 : o.dimensions.y)
+        let top = Float(AppCatalog.kind(o.kind).top(o.dimensions))
         // Attempt labels sit lower so they do not overlap the target label at the goal.
         label?.position = SIMD3<Float>(0, top + (style == .attempt ? 0.08 : 0.2), 0)
     }
 
-    private static func material(_ o: SceneObject, style: Style, dimmed: Bool) -> RealityKit.Material {
+    private static func material(hex: String, style: Style, opacity: Float) -> RealityKit.Material {
         switch style {
         case .target:
             var m = UnlitMaterial(color: UIColor(red: 0.18, green: 0.64, blue: 0.66, alpha: 1))
@@ -245,18 +274,46 @@ final class ObjectNode {
             m.baseColor = .init(tint: UIColor(red: 0.91, green: 0.54, blue: 0.17, alpha: 1))
             m.blending = .transparent(opacity: .init(floatLiteral: 0.8))
             return m
+        case .placement:
+            var m = UnlitMaterial(color: UIColor(hex: hex) ?? .white)
+            m.blending = .transparent(opacity: .init(floatLiteral: 0.5))
+            return m
         case .proposal:
             var m = PhysicallyBasedMaterial()
-            m.baseColor = .init(tint: UIColor(hex: o.color) ?? .lightGray)
+            m.baseColor = .init(tint: UIColor(hex: hex) ?? .lightGray)
             m.roughness = 0.7
-            if dimmed { m.blending = .transparent(opacity: .init(floatLiteral: 0.35)) }
+            if opacity < 1 { m.blending = .transparent(opacity: .init(floatLiteral: opacity)) }
             return m
         }
     }
 
-    static func makeModel(_ o: SceneObject, style: Style, dimmed: Bool) -> Entity {
+    private static let unitBox = MeshResource.generateBox(size: 1)
+    private static let unitCylinder = MeshResource.generateCylinder(height: 1, radius: 0.5)
+    private static let unitSphere = MeshResource.generateSphere(radius: 0.5)
+
+    /// Catalog kinds: each part is a unit box/cylinder/sphere scaled into the object's size.
+    private static func partsModel(_ o: SceneObject, style: Style, opacity: Float) -> Entity {
         let d = SIMD3<Float>(o.dimensions)
-        let mat = material(o, style: style, dimmed: dimmed)
+        let group = Entity()
+        for part in AppCatalog.kind(o.kind).parts {
+            let mesh: MeshResource
+            switch part.shape {
+            case .box: mesh = unitBox
+            case .cylinder: mesh = unitCylinder
+            case .sphere: mesh = unitSphere
+            }
+            let mat = material(hex: Catalog.tintHex(part.tint, base: o.color), style: style, opacity: opacity)
+            let e = ModelEntity(mesh: mesh, materials: [mat])
+            e.scale = SIMD3<Float>(part.size) * d
+            e.position = SIMD3<Float>(part.center) * d
+            group.addChild(e)
+        }
+        return group
+    }
+
+    static func makeModel(_ o: SceneObject, style: Style, opacity: Float) -> Entity {
+        let d = SIMD3<Float>(o.dimensions)
+        let mat = material(hex: o.color, style: style, opacity: opacity)
         switch o.kind {
         case .pillar:
             let m = ModelEntity(mesh: .generateCylinder(height: d.y, radius: d.x / 2), materials: [mat])
@@ -275,6 +332,8 @@ final class ObjectNode {
                 group.addChild(face)
             }
             return group
+        default:
+            return partsModel(o, style: style, opacity: opacity)
         }
     }
 }

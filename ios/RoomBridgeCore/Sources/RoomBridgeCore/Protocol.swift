@@ -12,7 +12,10 @@ public typealias Quat = SIMD4<Double>  // [x, y, z, w]
 
 public enum Role: String, Codable, Sendable { case host, expert, viewer }
 
-public enum ObjectKind: String, Codable, Sendable, CaseIterable { case pillar, partition, panel }
+/// Same order as protocol/catalog.json (checked by the core checks).
+public enum ObjectKind: String, Codable, Sendable, CaseIterable {
+    case pillar, partition, door, window, table, chair, couch, cabinet, lamp, tv, panel, block
+}
 
 public enum GuidanceAxis: String, Codable, Sendable {
     case x, y, z
@@ -58,6 +61,59 @@ public struct SceneObject: Codable, Equatable, Sendable, Identifiable {
     public var owner: String
     public var createdBy: String
     public var updatedAt: Double
+    /// Set while this is a novice's proposal waiting for the expert.
+    public var proposal: Proposal?
+
+    public var pose: ObjectPose { ObjectPose(position: position, rotation: rotation, dimensions: dimensions) }
+
+    /// A local, not-yet-sent object (placement previews).
+    public init(local input: ObjectInput, epoch: Int) {
+        id = input.id
+        kind = input.kind
+        name = input.name
+        position = input.position
+        rotation = input.rotation
+        dimensions = input.dimensions
+        color = input.color
+        textureRef = input.textureRef
+        revision = 0
+        originEpoch = epoch
+        stale = false
+        owner = "host"
+        createdBy = ""
+        updatedAt = 0
+        proposal = nil
+    }
+}
+
+public struct ObjectPose: Codable, Equatable, Sendable {
+    public var position: Vec3
+    public var rotation: Quat
+    public var dimensions: Vec3
+    public init(position: Vec3, rotation: Quat, dimensions: Vec3) {
+        self.position = position
+        self.rotation = rotation
+        self.dimensions = dimensions
+    }
+}
+
+public struct Proposal: Codable, Equatable, Sendable {
+    public var byClientId: String
+    public var byName: String
+    public var proposedAt: Double
+    public var novice: ObjectPose
+}
+
+public struct ProposalResolved: Codable, Equatable, Sendable {
+    public enum Outcome: String, Codable, Sendable { case accepted, adjusted, rejected }
+    public var objectId: String
+    public var objectName: String
+    public var kind: ObjectKind
+    public var outcome: Outcome
+    public var byName: String
+    public var note: String?
+    public var before: ObjectPose
+    public var after: ObjectPose?
 }
 
 public struct Pose: Codable, Equatable, Sendable {
@@ -212,7 +268,7 @@ public struct OutgoingEnvelope<P: Encodable>: Encodable {
 }
 
 /// Messages geometry is bound to; must carry the current origin epoch.
-public let epochBoundTypes: Set<String> = ["object.create", "object.update", "guidance.set", "guidance.begin", "guidance.attempt"]
+public let epochBoundTypes: Set<String> = ["object.create", "object.propose", "object.update", "guidance.set", "guidance.begin", "guidance.attempt"]
 
 public enum ServerEvent: Sendable {
     case authOK(AuthOK)
@@ -224,6 +280,7 @@ public enum ServerEvent: Sendable {
     case commentAdded(Comment)
     case reactionUpdated(objectId: String, Reactions)
     case guidance(Guidance?)
+    case proposalResolved(ProposalResolved)
     case scanReady(ScanMeta)
     case previewStatus(PreviewStatus)
     case roomEnded(String)
@@ -268,6 +325,7 @@ public enum ServerMessageDecoder {
             let r = try p(ReactionPayload.self)
             event = .reactionUpdated(objectId: r.objectId, Reactions(like: r.like, discuss: r.discuss))
         case "guidance.state": event = .guidance(try p(GuidancePayload.self).guidance)
+        case "proposal.resolved": event = .proposalResolved(try p(ProposalResolved.self))
         case "scan.ready": event = .scanReady(try p(ScanPayload.self).scan)
         case "preview.status": event = .previewStatus(try p(PreviewStatus.self))
         case "room.ended": event = .roomEnded(try p(EndedPayload.self).reason)
@@ -377,4 +435,76 @@ public struct PreviewStatusPayload: Encodable, Sendable {
 public struct OriginResetPayload: Encodable, Sendable {
     public var reason: String
     public init(reason: String) { self.reason = reason }
+}
+
+/// The object fields a client sends (`ObjectInput` in PROTOCOL.md).
+public struct ObjectInput: Encodable, Equatable, Sendable {
+    public var id: String
+    public var kind: ObjectKind
+    public var name: String
+    public var position: Vec3
+    public var rotation: Quat
+    public var dimensions: Vec3
+    public var color: String
+    public var textureRef: String?
+
+    public init(id: String, kind: ObjectKind, name: String, position: Vec3, rotation: Quat, dimensions: Vec3, color: String, textureRef: String?) {
+        self.id = id
+        self.kind = kind
+        self.name = name
+        self.position = position
+        self.rotation = rotation
+        self.dimensions = dimensions
+        self.color = color
+        self.textureRef = textureRef
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(name, forKey: .name)
+        try c.encode(position, forKey: .position)
+        try c.encode(rotation, forKey: .rotation)
+        try c.encode(dimensions, forKey: .dimensions)
+        try c.encode(color, forKey: .color)
+        try c.encode(textureRef, forKey: .textureRef)  // explicit null, not omitted
+    }
+    enum CodingKeys: String, CodingKey { case id, kind, name, position, rotation, dimensions, color, textureRef }
+}
+
+public struct ProposePayload: Encodable, Sendable {
+    public var object: ObjectInput
+    public init(object: ObjectInput) { self.object = object }
+}
+
+/// `object.update` for the novice's own proposal. Only the fields that are set are sent.
+public struct ObjectUpdatePayload: Encodable, Sendable {
+    public struct Patch: Encodable, Sendable {
+        public var name: String?
+        public var position: Vec3?
+        public var rotation: Quat?
+        public var dimensions: Vec3?
+        public var color: String?
+        public init(name: String? = nil, position: Vec3? = nil, rotation: Quat? = nil, dimensions: Vec3? = nil, color: String? = nil) {
+            self.name = name
+            self.position = position
+            self.rotation = rotation
+            self.dimensions = dimensions
+            self.color = color
+        }
+    }
+    public var id: String
+    public var baseRevision: Int
+    public var patch: Patch
+    public init(id: String, baseRevision: Int, patch: Patch) {
+        self.id = id
+        self.baseRevision = baseRevision
+        self.patch = patch
+    }
+}
+
+public struct ObjectIdPayload: Encodable, Sendable {
+    public var id: String
+    public init(id: String) { self.id = id }
 }

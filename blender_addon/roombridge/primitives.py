@@ -6,6 +6,9 @@ import math
 
 import bmesh
 import bpy
+from mathutils import Matrix
+
+from . import catalog, coords
 
 DESIGN_COLLECTION = "RoomBridge Design"
 SCAN_COLLECTION = "RoomBridge Room Scan (reference)"
@@ -16,9 +19,11 @@ TARGET_NAME = "RB TARGET (ghost)"
 ATTEMPT_NAME = "RB NOVICE ATTEMPT"
 SCAN_NAME = "RB Room Scan (approximate)"
 
-DEFAULT_COLORS = {"pillar": "#c9b79c", "partition": "#d8cfc0", "panel": "#ffffff"}
-DEFAULT_DIMENSIONS = {"pillar": (0.3, 2.4, 0.3), "partition": (1.2, 2.0, 0.1), "panel": (0.8, 0.6, 0.03)}
-DEFAULT_NAMES = {"pillar": "Pillar", "partition": "Partition", "panel": "Picture Panel"}
+DEFAULT_COLORS = {k: c["color"] for k, c in catalog.BY_KIND.items()}
+DEFAULT_DIMENSIONS = {k: tuple(c["dimensions"]) for k, c in catalog.BY_KIND.items()}
+DEFAULT_NAMES = {k: c["label"] for k, c in catalog.BY_KIND.items()}
+# These three predate the catalog and keep their hand-built meshes (the panel's picture UVs).
+LEGACY_KINDS = ("pillar", "partition", "panel")
 
 
 def ensure_collection(name: str, selectable: bool = True) -> bpy.types.Collection:
@@ -44,6 +49,8 @@ def hex_to_linear_rgba(hex_color: str, alpha: float = 1.0):
 
 def unit_mesh(kind: str, name: str) -> bpy.types.Mesh:
     """1 m unit primitive; object.scale then equals the physical dimensions (see COORDINATES.md)."""
+    if kind not in LEGACY_KINDS:
+        return _parts_mesh(kind, name)
     bm = bmesh.new()
     try:
         if kind == "pillar":
@@ -67,6 +74,36 @@ def unit_mesh(kind: str, name: str) -> bpy.types.Mesh:
                 for li in poly.loop_indices:
                     co = mesh.vertices[mesh.loops[li].vertex_index].co
                     uv.data[li].uv = (co.x + 0.5, co.z + 0.5)
+    return mesh
+
+
+def _parts_mesh(kind: str, name: str) -> bpy.types.Mesh:
+    """Builds a catalog kind from its parts, in the same unit box the phone uses."""
+    spec = catalog.get(kind)
+    tints = catalog.tint_order(kind)
+    bm = bmesh.new()
+    try:
+        for part in spec["parts"]:
+            # Canonical unit-box placement -> Blender local axes (Y up becomes Z up).
+            center = coords.c2b(part["center"])
+            sx, sy, sz = part["size"]
+            m = Matrix.Translation(center) @ Matrix.Diagonal((sx, sz, sy, 1.0))
+            before = len(bm.faces)
+            if part["shape"] == "box":
+                bmesh.ops.create_cube(bm, size=1.0, matrix=m)
+            elif part["shape"] == "cylinder":
+                bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=24, radius1=0.5, radius2=0.5, depth=1.0, matrix=m)
+            else:
+                bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=0.5, matrix=m)
+            bm.faces.ensure_lookup_table()
+            index = tints.index(part["tint"])
+            for i in range(before, len(bm.faces)):
+                bm.faces[i].material_index = index
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        mesh = bpy.data.meshes.new(name)
+        bm.to_mesh(mesh)
+    finally:
+        bm.free()
     return mesh
 
 
@@ -136,6 +173,12 @@ def apply_materials(obj: bpy.types.Object, kind: str, hex_color: str, texture_re
     mats = [base]
     if kind == "panel":
         mats.append(picture_material() if texture_ref == "sample:picture" else base)
+    elif kind not in LEGACY_KINDS:
+        for tint in catalog.tint_order(kind)[1:]:
+            shade = catalog.tint_hex(tint, hex_color)
+            # Fixed tints are shared; base-derived shades follow the object's colour.
+            mat_name = f"RB fixed {shade}" if tint.startswith("#") else f"RB {obj.get('rb_id', obj.name)[:8]} {tint}"
+            mats.append(color_material(mat_name, shade))
     while len(mesh.materials) < len(mats):
         mesh.materials.append(None)
     for i, m in enumerate(mats):

@@ -72,7 +72,7 @@ Every control message (both directions) is a JSON object:
 * `sceneRevision`: on server messages, the room's scene revision after the
   change. Clients may omit it.
 * `originEpoch`: **required** on messages that carry geometry (`object.create`,
-  `object.update`, `guidance.set`, `guidance.begin`, `guidance.attempt`). If it is
+  `object.propose`, `object.update`, `guidance.set`, `guidance.begin`, `guidance.attempt`). If it is
   not the room's current epoch, the server replies `error` `stale_epoch`.
 * Every client message except `ping` is answered with either
   `ack { ackOf }` or `error { ackOf, code, message }`.
@@ -88,16 +88,29 @@ Every control message (both directions) is a JSON object:
   includes the current object. Blender therefore keeps at most one update in
   flight per object and coalesces newer edits into the next one.
 * **Design objects belong to the expert.** Viewers can never change the scene.
-  The host never edits a design object directly. During guidance, the host
+  The host never edits an expert's object directly. During guidance, the host
   controls only a separate **attempt**, which is a signed scalar offset along
   the guidance axis. The server computes the attempt position. Approval is
   applied by the server, which writes the attempt pose into the object and
   bumps its revision. Cancel or reset discard the attempt. The expert and the
   novice never write to the same field, so there is no tug-of-war.
+* **The novice can propose.** `object.propose` creates an object with
+  `owner: "host"` and a `proposal` record. While it is pending, the host may
+  `object.update` or `object.delete` (withdraw) it, and the expert may adjust it
+  with `object.update`. The expert then sends `proposal.accept` (the object
+  becomes an ordinary expert-owned object) or `proposal.reject` (it is deleted;
+  `object.delete` by the expert counts as a rejection). Either way everyone
+  receives `proposal.resolved`, which carries the novice's last version and the
+  final one so clients can explain what the expert changed. An optional `note`
+  is also posted as an expert comment on the object. Proposals cannot be
+  guided until accepted. At most 12 proposals can wait at once.
 
 | Message | host | expert | viewer |
 | --- | :-: | :-: | :-: |
-| `object.create` / `object.update` / `object.delete` | | yes | |
+| `object.create` | | yes | |
+| `object.update` / `object.delete` | own pending proposals | yes | |
+| `object.propose` | yes | | |
+| `proposal.accept` / `proposal.reject` | | yes | |
 | `guidance.set` / `guidance.begin` / `guidance.approve` / `guidance.cancel` | | yes | |
 | `guidance.reset` | yes | yes | |
 | `guidance.attempt` | yes | | |
@@ -119,6 +132,8 @@ Forbidden messages get `error` `forbidden`.
 | `object.create` | `{ object: ObjectInput }` |
 | `object.update` | `{ id, baseRevision, patch: Partial<ObjectInput without id/kind> }` |
 | `object.delete` | `{ id }` |
+| `object.propose` | `{ object: ObjectInput }` (host) |
+| `proposal.accept` / `proposal.reject` | `{ id, note? (1-300) }` (expert) |
 | `selection` | `{ objectId: string \| null }` |
 | `comment.add` | `{ objectId: string \| null, text (1-500) }` (5 per 10 s per client) |
 | `reaction.toggle` | `{ objectId, kind: "like" \| "discuss" }` |
@@ -130,7 +145,13 @@ Forbidden messages get `error` `forbidden`.
 | `guidance.cancel` | `{ guidanceId }` |
 | `preview.status` | `{ state: "live" \| "paused", targetFps, width }` (host) |
 
-`ObjectInput = { id (UUID), kind: "pillar"|"partition"|"panel", name (1-60), position: Vec3, rotation: Quat [x,y,z,w], dimensions: Vec3, color: "#RRGGBB", textureRef: null | "sample:picture" }`
+`ObjectInput = { id (UUID), kind, name (1-60), position: Vec3, rotation: Quat [x,y,z,w], dimensions: Vec3, color: "#RRGGBB", textureRef: null | "sample:picture" }`
+
+`kind` is one of the kinds in [`catalog.json`](catalog.json): `pillar`, `partition`, `door`,
+`window`, `table`, `chair`, `couch`, `cabinet`, `lamp`, `tv`, `panel` (picture), `block`
+(the novice's custom box). Round kinds (`pillar`, `lamp`) need `dimensions[0] == dimensions[2]`.
+The catalog also defines how every client builds each kind from boxes, cylinders and
+spheres, its default size and colour, where it is placed (floor or wall), and its CAD lesson.
 
 ## Server -> client messages
 
@@ -145,6 +166,7 @@ Forbidden messages get `error` `forbidden`.
 | `comment.added` | `{ comment }` |
 | `reaction.updated` | `{ objectId, like: clientId[], discuss: clientId[] }` |
 | `guidance.state` | `{ guidance: Guidance \| null }` |
+| `proposal.resolved` | `{ objectId, objectName, kind, outcome: "accepted"\|"adjusted"\|"rejected", byName, note, before: ObjectPose, after: ObjectPose \| null }` |
 | `scan.ready` | `{ scan: ScanMeta }` |
 | `preview.status` | `{ state: "live"\|"paused"\|"offline", hostConnected, viewers, targetFps, width }` |
 | `room.ended` | `{ reason }`, after which sockets are closed |
@@ -152,7 +174,27 @@ Forbidden messages get `error` `forbidden`.
 | `error` | `{ ackOf?, code, message, current? }` |
 | `pong` | `{}` |
 
-`SceneObject = ObjectInput + { revision, originEpoch, stale (originEpoch < room epoch), owner: "expert", createdBy, updatedAt }`
+`SceneObject = ObjectInput + { revision, originEpoch, stale (originEpoch < room epoch), owner: "expert"|"host", createdBy, updatedAt, proposal: null | { byClientId, byName, proposedAt, novice: ObjectPose } }`
+
+`ObjectPose = { position, rotation, dimensions }`. `outcome` is `adjusted` when the expert
+moved, turned or resized the proposal (by more than 1 cm, 1 degree or 5 mm) before accepting.
+
+### Learning captions
+
+Clients explain every change in Blender terms so the novice learns the CAD operation
+behind it. The rules are fixed by [`fixtures/narration.json`](fixtures/narration.json),
+which the iOS app and the web viewer both pass:
+
+* A move is converted to Blender axes (X = x, Y = -z, Z = y). If one axis carries at least
+  90% of it, it is "moved NAME 50 cm along the red X axis (left/right)" with `G X 0.5`;
+  otherwise "moved NAME 50 cm" with one `G` per axis.
+* A heading change of at least 2 degrees is "turned NAME 90°" with `R Z 90`.
+* A size change of at least 1% (and 5 mm) is `S 1.5` when uniform, `S Shift+Z r` when only
+  the footprint changes, otherwise one `S X/Y/Z r` per axis.
+* Values are typed the way Blender accepts them: at most two decimals, no trailing zeros.
+
+A Blender drag arrives as many small updates; clients narrate a gesture once it has
+rested (the phone waits 0.8 s; the web viewer merges updates less than 1.5 s apart).
 
 `Guidance = { id, objectId, state: "preview"|"active"|"approved", axis, tolerance, start: {position, rotation}, target: {position, rotation}, attempt: null | {offset, position, distance, withinTolerance, holding, seq, updatedAt}, originEpoch }`
 

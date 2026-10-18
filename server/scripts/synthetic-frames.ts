@@ -4,10 +4,10 @@
  * Creates its own room, joins as the host, and streams the pre-rendered frames in
  * ./synthetic-frames. Every frame carries the synthetic flag in its header and the
  * images themselves say "SYNTHETIC TEST FRAME", so this can never be mistaken for a
- * camera or LiDAR result. With --objects it also joins as an expert and adds one of
- * each object kind.
+ * camera or LiDAR result. With --objects it also joins as an expert and adds a few
+ * objects; with --propose the host proposes a table and a chair for the expert to review.
  *
- *   npm run synthetic-frames -w server -- --server http://127.0.0.1:8787 --fps 5 --objects
+ *   npm run synthetic-frames -w server -- --server http://127.0.0.1:8787 --fps 5 --objects --propose
  */
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
@@ -126,6 +126,19 @@ async function main() {
       send(expert.ws, expert.auth, "object.create", { object }, expert.epoch());
     }
     console.log(`  Added ${objects.length} sample objects as "Synthetic expert".`);
+  }
+
+  if (flag("propose")) {
+    // The scripted host proposes furniture, as a novice would from the phone's object library.
+    const proposals = [
+      { kind: "table", name: "Table 1", position: [0.8, 0, -1.2], dimensions: [1.2, 0.75, 0.8], color: "#a0764f" },
+      { kind: "chair", name: "Chair 1", position: [0.8, 0, -0.5], rotation: [0, 1, 0, 0], dimensions: [0.45, 0.9, 0.5], color: "#7a8b99" },
+    ];
+    for (const o of proposals) {
+      const object = { id: randomUUID(), rotation: [0, 0, 0, 1], textureRef: null, ...o };
+      send(host.ws, host.auth, "object.propose", { object }, host.epoch());
+    }
+    console.log(`  Proposed ${proposals.length} objects as the host; review them in Blender under Novice Proposals.`);
   }
 
   const preview = new WebSocket(`${wsBase}/ws/preview`);

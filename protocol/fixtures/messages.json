@@ -162,9 +162,82 @@
           "holding": true
         }
       }
+    },
+    {
+      "name": "object.propose couch",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.propose",
+        "roomId": "r_test",
+        "clientId": "c_host",
+        "messageId": "m-13",
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "9a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d",
+            "kind": "couch",
+            "name": "Couch",
+            "position": [0.5, -1.2, -2.5],
+            "rotation": [0, 0, 0, 1],
+            "dimensions": [2, 0.85, 0.9],
+            "color": "#5b7c99",
+            "textureRef": null
+          }
+        }
+      }
+    },
+    {
+      "name": "proposal.accept with note",
+      "message": {
+        "protocolVersion": 1,
+        "type": "proposal.accept",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-14",
+        "payload": {
+          "id": "9a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d",
+          "note": "Nice spot! I moved it 30 cm from the wall so the door can open."
+        }
+      }
     }
   ],
   "invalidClient": [
+    {
+      "name": "elliptical lamp",
+      "expectedError": "invalid_dimensions",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.create",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-15",
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a15",
+            "kind": "lamp",
+            "name": "Oval lamp",
+            "position": [0, 0, 0],
+            "rotation": [0, 0, 0, 1],
+            "dimensions": [0.4, 1.6, 0.6],
+            "color": "#f3e3c3",
+            "textureRef": null
+          }
+        }
+      }
+    },
+    {
+      "name": "accepting something that is not a proposal",
+      "expectedError": "not_found",
+      "message": {
+        "protocolVersion": 1,
+        "type": "proposal.accept",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-16",
+        "payload": { "id": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a99" }
+      }
+    },
     {
       "name": "wrong protocol version",
       "expectedError": "unsupported_protocol",
@@ -440,6 +513,64 @@
             },
             "originEpoch": 1
           }
+        }
+      }
+    },
+    {
+      "name": "object.created proposal from the novice",
+      "message": {
+        "protocolVersion": 1,
+        "type": "object.created",
+        "roomId": "r_test",
+        "clientId": "c_host",
+        "messageId": "s-3",
+        "sceneRevision": 7,
+        "originEpoch": 1,
+        "payload": {
+          "object": {
+            "id": "9a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d",
+            "kind": "couch",
+            "name": "Couch",
+            "position": [0.5, -1.2, -2.5],
+            "rotation": [0, 0, 0, 1],
+            "dimensions": [2, 0.85, 0.9],
+            "color": "#5b7c99",
+            "textureRef": null,
+            "revision": 1,
+            "originEpoch": 1,
+            "stale": false,
+            "owner": "host",
+            "createdBy": "c_host",
+            "updatedAt": 1760000001000,
+            "proposal": {
+              "byClientId": "c_host",
+              "byName": "Maya",
+              "proposedAt": 1760000001000,
+              "novice": { "position": [0.5, -1.2, -2.5], "rotation": [0, 0, 0, 1], "dimensions": [2, 0.85, 0.9] }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "proposal.resolved adjusted",
+      "message": {
+        "protocolVersion": 1,
+        "type": "proposal.resolved",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "s-4",
+        "sceneRevision": 9,
+        "originEpoch": 1,
+        "payload": {
+          "objectId": "9a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d",
+          "objectName": "Couch",
+          "kind": "couch",
+          "outcome": "adjusted",
+          "byName": "Sam",
+          "note": "Nice spot! I moved it 30 cm from the wall so the door can open.",
+          "before": { "position": [0.5, -1.2, -2.5], "rotation": [0, 0, 0, 1], "dimensions": [2, 0.85, 0.9] },
+          "after": { "position": [0.5, -1.2, -2.2], "rotation": [0, 0, 0, 1], "dimensions": [2, 0.85, 0.9] }
         }
       }
     }

@@ -124,10 +124,16 @@ describe("state reducer", () => {
       },
     });
     for (const f of messages.server) s = reduce(s, f.message);
-    expect(s.objects.map((o) => o.id)).toEqual(["6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11"]);
+    expect(s.objects.map((o) => o.id)).toEqual(["6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11", "9a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d"]);
+    expect(s.objects[1]?.proposal?.byName).toBe("Maya");
     expect(s.guidance?.attempt?.withinTolerance).toBe(true);
-    expect(s.room?.sceneRevision).toBe(6);
+    expect(s.room?.sceneRevision).toBe(9);
     expect(guidanceCaption(s.guidance, s.objects)?.title).toBe("“Pillar 1” is on target");
+    // The expert's decision is explained in Blender terms, with their note.
+    expect(s.feed[0]?.actor).toBe("Sam");
+    expect(s.feed[0]?.steps.map((x) => x.text)).toEqual(["approved H’s Couch after adjusting it", "moved it 30 cm along the green Y axis (forward/back)"]);
+    expect(s.feed[0]?.steps[1]?.shortcut).toBe("G Y -0.3");
+    expect(s.feed[0]?.note).toMatch(/door can open/);
   });
 
   it("marks comments on deleted objects instead of dropping them", () => {

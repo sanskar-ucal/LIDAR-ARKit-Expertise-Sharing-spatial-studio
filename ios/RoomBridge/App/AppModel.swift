@@ -55,6 +55,23 @@ final class AppModel {
     private(set) var onTarget = false
     private(set) var attemptsSent = 0
 
+    // MARK: Object library, proposals and learning
+    private(set) var placingKind: ObjectKind?
+    private(set) var placementReady = false
+    private(set) var placementHint = ""
+    var editingProposalId: String?
+    private(set) var learnFeed: [LearnItem] = []
+    private(set) var toast: LearnItem?
+    private(set) var skillsSeen: Set<CADConcept> = []
+    @ObservationIgnored private var narration = EditNarrationBuffer(settle: 0.8)
+    @ObservationIgnored private var narrationTimer: Timer?
+    @ObservationIgnored private var toastTask: Task<Void, Never>?
+    @ObservationIgnored private var placementPose: ARSessionController.Placement?
+    /// Local edits to the novice's own proposals that the server has not confirmed yet.
+    @ObservationIgnored private var drafts: [String: SceneObject] = [:]
+    @ObservationIgnored private var proposalInFlight: [String: String] = [:]  // objectId -> messageId
+    @ObservationIgnored private var proposalDirty: Set<String> = []
+
     // MARK: Developer diagnostics
     private(set) var previewFps: Double = 0
     private(set) var previewWidth: Int = 0
@@ -88,6 +105,13 @@ final class AppModel {
     var guidedObject: SceneObject? { guidance.flatMap { g in objects.first { $0.id == g.objectId } } }
     var selectedObject: SceneObject? { selectedObjectId.flatMap { id in objects.first { $0.id == id } } }
     var staleCount: Int { objects.filter(\.stale).count }
+    /// Only the host can propose, so every pending proposal is the novice's own.
+    var myProposals: [SceneObject] { objects.filter { $0.proposal != nil && !$0.stale }.map { drafts[$0.id] ?? $0 } }
+    var editingProposal: SceneObject? {
+        guard let id = editingProposalId, let o = objects.first(where: { $0.id == id }), o.proposal != nil else { return nil }
+        return drafts[id] ?? o
+    }
+    var expertName: String { participants.first { $0.role == .expert && $0.connected }?.displayName ?? "The expert" }
     var viewerLink: String? { created?.viewerLink }
     var expertLink: String? { created?.expertLink }
     var canManipulate: Bool {
@@ -164,6 +188,9 @@ final class AppModel {
         diagTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshDiagnostics() }
         }
+        narrationTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.narrationTick() }
+        }
     }
 
     private func resetRoomState() {
@@ -172,6 +199,9 @@ final class AppModel {
         awaitingOriginReset = false; pendingOriginReset = false; lastError = nil; selectedObjectId = nil
         localOffset = 0; holding = false; onTarget = false; attemptSeq = 0; guidanceKey = ""; drag = nil
         clientId = nil
+        placingKind = nil; placementReady = false; placementPose = nil; editingProposalId = nil
+        learnFeed = []; toast = nil; skillsSeen = []; narration = EditNarrationBuffer(settle: 0.8)
+        drafts = [:]; proposalInFlight = [:]; proposalDirty = []
     }
 
     /// Leaves the room locally. The host's room stays open until it expires or is ended.
@@ -187,6 +217,8 @@ final class AppModel {
 
     private func teardown() {
         diagTimer?.invalidate(); diagTimer = nil
+        narrationTimer?.invalidate(); narrationTimer = nil
+        toastTask?.cancel(); toastTask = nil
         broadcaster?.stop(); broadcaster = nil
         preview.shutdown()
         control?.stop(); control = nil
@@ -239,11 +271,16 @@ final class AppModel {
                 ar?.setScanVisualization(true)
             }
             if let sel = selectedObjectId, !objects.contains(where: { $0.id == sel }) { selectedObjectId = nil }
+            for id in drafts.keys where !objects.contains(where: { $0.id == id && $0.proposal != nil }) { drafts[id] = nil }
+            if let id = editingProposalId, !objects.contains(where: { $0.id == id && $0.proposal != nil }) { editingProposalId = nil }
+            proposalInFlight = [:]
+            proposalDirty = []
         case .objectUpserted(let o):
-            if let i = objects.firstIndex(where: { $0.id == o.id }) { objects[i] = o } else { objects.append(o) }
+            upsert(o, from: header.clientId)
         case .objectDeleted(let id):
-            objects.removeAll { $0.id == id }
-            if selectedObjectId == id { selectedObjectId = nil }
+            removeObject(id, from: header.clientId)
+        case .proposalResolved(let r):
+            resolved(r)
         case .presence(let p):
             participants = p
         case .commentAdded(let c):
@@ -257,7 +294,9 @@ final class AppModel {
         case .previewStatus(let p):
             previewStatus = p
         case .error(let e):
-            lastError = "\(e.message) (\(e.code))"
+            if !proposalAcked(e.ackOf, error: e) { lastError = "\(e.message) (\(e.code))" }
+        case .ack(let messageId):
+            proposalAcked(messageId, error: nil)
         case .roomEnded(let reason):
             lastError = "Room ended: \(reason)"
             broadcaster?.stop()
@@ -265,7 +304,7 @@ final class AppModel {
             broadcasting = false
         case .authError(let e):
             lastError = e.message
-        case .ack, .pong, .unknown:
+        case .pong, .unknown:
             break
         }
         if let s = header.sceneRevision, var r = room { r.sceneRevision = s; room = r }
@@ -321,6 +360,7 @@ final class AppModel {
     }
 
     private func onFrame(_ camera: simd_float4x4) {
+        if placingKind != nil { updatePlacement() }
         guard holding, let drag, let g = guidance, g.state == .active else { return }
         let pos = SIMD3<Float>(camera.columns.3.x, camera.columns.3.y, camera.columns.3.z)
         localOffset = drag.offset(camera: pos)
@@ -520,12 +560,241 @@ final class AppModel {
     private func renderScene() {
         guard let ar else { return }
         var decor: [String: SceneRenderer.ObjectDecor] = [:]
-        for o in objects { decor[o.id] = .init() }
+        for o in objects { decor[o.id] = .init(mineProposal: o.proposal != nil, editing: o.id == editingProposalId) }
         for c in comments { if let id = c.objectId { decor[id]?.commentCount += 1 } }
         for p in participants where p.connected && p.clientId != clientId {
             if let id = p.selectedObjectId { decor[id]?.selectedBy.append(p.displayName) }
         }
-        ar.renderer.sync(objects: objects, decor: decor, guidance: guidance)
+        ar.renderer.sync(objects: objects.map { drafts[$0.id] ?? $0 }, decor: decor, guidance: guidance)
         ar.renderer.updateAttempt(guidance: guidance, object: guidedObject, offset: localOffset, holding: holding)
+    }
+}
+
+// MARK: - Object library, proposals and CAD narration
+
+extension AppModel {
+    private func name(of clientId: String) -> String {
+        participants.first { $0.clientId == clientId }?.displayName ?? "The expert"
+    }
+
+    private func upsert(_ o: SceneObject, from sender: String) {
+        let previous = objects.first { $0.id == o.id }
+        let mine = sender == clientId
+        if let i = objects.firstIndex(where: { $0.id == o.id }) { objects[i] = o } else { objects.append(o) }
+        if let draft = drafts[o.id] {
+            if !mine {
+                drafts[o.id] = nil  // the expert changed our proposal: theirs wins
+            } else if proposalInFlight[o.id] == nil && !proposalDirty.contains(o.id) && Self.samePose(draft.pose, o.pose) {
+                drafts[o.id] = nil
+            }
+        }
+        guard !mine, !o.stale else { return }
+        if let previous {
+            // The expert's adjustments to our own proposal are explained when they decide on it, and an
+            // approved guidance move was made by the novice, not the expert.
+            if previous.proposal == nil && guidance?.objectId != o.id {
+                narration.record(objectId: o.id, actor: name(of: sender), name: o.name, from: previous.pose, to: o.pose, now: CACurrentMediaTime())
+            }
+        } else if o.proposal == nil {
+            push(LearnItem(actor: name(of: sender), steps: [Narrator.added(name: o.name, blender: AppCatalog.kind(o.kind).blender)],
+                           note: AppCatalog.kind(o.kind).lesson, tone: .info))
+        }
+    }
+
+    private func removeObject(_ id: String, from sender: String) {
+        let previous = objects.first { $0.id == id }
+        objects.removeAll { $0.id == id }
+        if selectedObjectId == id { selectedObjectId = nil }
+        if editingProposalId == id { editingProposalId = nil }
+        drafts[id] = nil
+        narration.drop(id)
+        // A rejected proposal is explained by proposal.resolved instead.
+        if let previous, previous.proposal == nil, sender != clientId {
+            push(LearnItem(actor: name(of: sender), steps: [Narrator.deleted(name: previous.name)], tone: .info))
+        }
+    }
+
+    private func resolved(_ r: ProposalResolved) {
+        if editingProposalId == r.objectId { editingProposalId = nil }
+        narration.drop(r.objectId)
+        drafts[r.objectId] = nil
+        var steps: [NarrationStep]
+        let tone: LearnItem.Tone
+        switch r.outcome {
+        case .accepted:
+            steps = [NarrationStep(concept: .approve, text: "approved your \(r.objectName) ✓", shortcut: "")]
+            tone = .success
+            Haptics.approved()
+        case .adjusted:
+            steps = [NarrationStep(concept: .approve, text: "approved your \(r.objectName) after adjusting it", shortcut: "")]
+            if let after = r.after { steps += Narrator.describe(name: "it", before: r.before, after: after) }
+            tone = .success
+            Haptics.approved()
+        case .rejected:
+            steps = [NarrationStep(concept: .approve, text: "removed your \(r.objectName)", shortcut: "")]
+            tone = .warning
+            Haptics.rejected()
+        }
+        push(LearnItem(actor: r.byName, steps: steps, note: r.note, tone: tone))
+    }
+
+    private func narrationTick() {
+        if placingKind != nil && sampleMode { updatePlacement() }  // no AR frames in the sample room
+        for g in narration.flush(now: CACurrentMediaTime()) {
+            push(LearnItem(actor: g.actor, steps: g.steps, tone: .info))
+        }
+    }
+
+    private func push(_ item: LearnItem) {
+        var item = item
+        let concepts = item.steps.map(\.concept)
+        item.newConcepts = concepts.filter { !skillsSeen.contains($0) }.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
+        skillsSeen.formUnion(concepts)
+        learnFeed.insert(item, at: 0)
+        if learnFeed.count > 40 { learnFeed.removeLast(learnFeed.count - 40) }
+        toast = item
+        if item.actor != "You" && item.tone == .info { Haptics.light() }
+        toastTask?.cancel()
+        let id = item.id
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(item.newConcepts.isEmpty ? 6 : 9))
+            if !Task.isCancelled, self?.toast?.id == id { self?.toast = nil }
+        }
+    }
+
+    func dismissToast() { toast = nil }
+
+    private static func samePose(_ a: ObjectPose, _ b: ObjectPose) -> Bool {
+        let eps = 1e-4
+        return simd_length(a.position - b.position) < eps && simd_length(a.dimensions - b.dimensions) < eps
+            && abs(abs(simd_dot(a.rotation, b.rotation)) - 1) < eps
+    }
+
+    // MARK: Placement
+
+    func beginPlacement(_ kind: ObjectKind) {
+        guard isConnected, !awaitingOriginReset else { return }
+        placingKind = kind
+        editingProposalId = nil
+        placementReady = false
+        updatePlacement()
+    }
+
+    func cancelPlacement() {
+        placingKind = nil
+        placementPose = nil
+        ar?.renderer.showPlacement(nil, label: "")
+    }
+
+    private func updatePlacement() {
+        guard let kind = placingKind, let ar else { return }
+        let spec = AppCatalog.kind(kind)
+        let pose = (sampleMode || tracking.allowsManipulation) ? ar.placement(for: spec, dimensions: spec.dimensions) : nil
+        placementPose = pose
+        placementReady = pose != nil
+        placementHint = pose == nil
+            ? (spec.mount == .wall ? "Aim the dot at a wall" : "Aim the dot at the floor")
+            : "Tap Place to propose it to \(expertName)"
+        guard let pose else {
+            ar.renderer.showPlacement(nil, label: "")
+            return
+        }
+        let preview = SceneObject(local: input(for: spec, at: pose, id: "placement-preview", name: spec.label), epoch: epoch)
+        ar.renderer.showPlacement(preview, label: "\(spec.label)\npreview")
+    }
+
+    private func input(for spec: Catalog.Kind, at pose: ARSessionController.Placement, id: String, name: String) -> ObjectInput {
+        ObjectInput(id: id, kind: spec.kind, name: name, position: pose.position, rotation: pose.rotation, dimensions: spec.dimensions,
+                    color: spec.color, textureRef: spec.kind == .panel ? "sample:picture" : nil)
+    }
+
+    func confirmPlacement() {
+        guard let kind = placingKind, let pose = placementPose else { return }
+        let spec = AppCatalog.kind(kind)
+        let n = objects.filter { $0.kind == kind }.count + 1
+        let name = "\(spec.label) \(n)"
+        let id = UUID().uuidString.lowercased()
+        guard control?.send("object.propose", ProposePayload(object: input(for: spec, at: pose, id: id, name: name)), originEpoch: epoch) != nil else {
+            lastError = "Not connected: the proposal was not sent"
+            return
+        }
+        cancelPlacement()
+        editingProposalId = id
+        push(LearnItem(actor: "You", steps: [Narrator.added(name: name, blender: spec.blender)], note: spec.lesson, tone: .info))
+    }
+
+    // MARK: Editing the novice's own proposals
+
+    func editProposal(_ edit: ProposalEdit) {
+        guard let current = editingProposal, let ar else { return }
+        var o = current
+        let spec = AppCatalog.kind(o.kind)
+        switch edit {
+        case .moveToCrosshair:
+            guard let p = ar.placement(for: spec, dimensions: o.dimensions) else {
+                lastError = spec.mount == .wall ? "Aim the phone at a wall to move it there" : "Aim the phone at the floor to move it there"
+                return
+            }
+            o.position = p.position
+            if spec.mount == .wall { o.rotation = p.rotation }
+        case .rotate(let degrees):
+            let turn = simd_quatd(angle: degrees * .pi / 180, axis: Vec3(0, 1, 0))
+            let q = simd_normalize(turn * simd_quatd(vector: o.rotation))
+            o.rotation = q.vector
+        case .resize(let axis, let delta):
+            var d = o.dimensions
+            d[axis] = min(max(d[axis] + delta, 0.05), 6)
+            if spec.round && axis != 1 { d.x = d[axis]; d.z = d[axis] }
+            o.dimensions = d
+        case .color(let hex):
+            o.color = hex
+        case .rename(let text):
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty else { return }
+            o.name = String(t.prefix(60))
+        }
+        guard o != current else { return }
+        drafts[o.id] = o
+        if case .color = edit {} else if case .rename = edit {} else {
+            narration.record(objectId: o.id, actor: "You", name: o.name, from: current.pose, to: o.pose, now: CACurrentMediaTime())
+        }
+        sendProposalUpdate(o.id)
+        renderScene()
+    }
+
+    private func sendProposalUpdate(_ id: String) {
+        if proposalInFlight[id] != nil {
+            proposalDirty.insert(id)  // coalesce: send the newest state once the server confirms
+            return
+        }
+        guard let draft = drafts[id], let server = objects.first(where: { $0.id == id }) else { return }
+        let patch = ObjectUpdatePayload.Patch(name: draft.name, position: draft.position, rotation: draft.rotation,
+                                              dimensions: draft.dimensions, color: draft.color)
+        proposalDirty.remove(id)
+        if let mid = control?.send("object.update", ObjectUpdatePayload(id: id, baseRevision: server.revision, patch: patch), originEpoch: epoch) {
+            proposalInFlight[id] = mid
+        }
+    }
+
+    /// Returns true if the message was one of our proposal edits.
+    @discardableResult
+    private func proposalAcked(_ messageId: String?, error: ServerError?) -> Bool {
+        guard let messageId, let id = proposalInFlight.first(where: { $0.value == messageId })?.key else { return false }
+        proposalInFlight[id] = nil
+        if let error, error.code != "stale_revision" {
+            drafts[id] = nil  // refused: show the server's version again
+            lastError = error.message
+            renderScene()
+            return true
+        }
+        if proposalDirty.contains(id) || error != nil { sendProposalUpdate(id) }
+        return true
+    }
+
+    func withdrawProposal() {
+        guard let o = editingProposal else { return }
+        control?.send("object.delete", ObjectIdPayload(id: o.id))
+        editingProposalId = nil
+        push(LearnItem(actor: "You", steps: [Narrator.deleted(name: o.name)], tone: .info))
     }
 }

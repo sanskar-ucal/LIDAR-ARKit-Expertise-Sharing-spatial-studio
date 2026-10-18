@@ -19,6 +19,9 @@ targets:
     platform: iOS
     sources:
       - path: RoomBridge
+      # The shared object catalog, bundled as a resource (single source of truth).
+      - path: ../protocol/catalog.json
+        buildPhase: resources
     dependencies:
       - package: RoomBridgeCore
         product: RoomBridgeCore

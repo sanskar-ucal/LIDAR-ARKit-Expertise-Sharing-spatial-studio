@@ -45,6 +45,9 @@ public final class CheckSuite {
         scan()
         guidance()
         simplifier()
+        try catalog()
+        try narration()
+        try proposalMessages()
     }
 
     func coordinates() throws {
@@ -93,6 +96,8 @@ public final class CheckSuite {
                 case ("guidance.state", .guidance(let g?)):
                     check(g.axis == .x && g.attempt?.withinTolerance == true, "decode guidance.state fields")
                     check(abs(g.targetOffset - 0.4) < 1e-9, "guidance target offset")
+                case ("object.created", .objectUpserted), ("proposal.resolved", .proposalResolved):
+                    break  // checked in proposalMessages()
                 default:
                     check(false, "unexpected decode for \(s["name"]!)")
                 }
@@ -184,5 +189,78 @@ public final class CheckSuite {
         let minX = r.vertices.map(\.x).min() ?? 0, maxX = r.vertices.map(\.x).max() ?? 0
         check(minX < 0.05 && maxX > 0.95, "simplifier preserves extent")
         check(r.vertices.allSatisfy { $0.y == 0 }, "simplifier keeps planar floor planar")
+    }
+
+    func catalog() throws {
+        let url = fixturesDir.deletingLastPathComponent().appendingPathComponent("catalog.json")
+        let c = try Catalog.decode(Data(contentsOf: url))
+        check(c.kinds.map(\.kind) == ObjectKind.allCases, "catalog kinds match ObjectKind order")
+        check(c.kinds.filter(\.round).map(\.kind) == [.pillar, .lamp], "round kinds")
+        check(c.kind(.window)?.mount == .wall && c.kind(.window)?.origin == .center, "window hangs on a wall")
+        check(c.kind(.table)?.parts.count == 5, "table has five parts")
+        check(c.groups.map(\.name) == ["Structure", "Furniture", "Lighting & decor", "Custom"], "catalog groups")
+        check(Catalog.tintHex("dark", base: "#a0764f") == "#58412b", "dark tint matches the add-on")
+        check(Catalog.tintHex("#123456", base: "#ffffff") == "#123456", "fixed tint")
+        check(c.kind(.panel)?.top(Vec3(0.8, 0.6, 0.03)) == 0.3 && c.kind(.table)?.top(Vec3(1, 0.75, 1)) == 0.75, "object top above origin")
+    }
+
+    func narration() throws {
+        let fx = try json("narration.json")
+        func pose(_ d: Any?) -> ObjectPose {
+            let p = d as! [String: Any]
+            return ObjectPose(position: v3(p["position"]), rotation: q4(p["rotation"]), dimensions: v3(p["dimensions"]))
+        }
+        for c in fx["cases"] as! [[String: Any]] {
+            let name = c["name"] as! String
+            let got = Narrator.describe(name: c["object"] as! String, before: pose(c["before"]), after: pose(c["after"]))
+            let want = (c["steps"] as! [[String: String]]).map {
+                NarrationStep(concept: CADConcept(rawValue: $0["concept"]!)!, text: $0["text"]!, shortcut: $0["shortcut"]!)
+            }
+            check(got == want, "narration \(name): \(got.map { "\($0.text) [\($0.shortcut)]" })")
+        }
+        // A drag arrives as many small updates; it is narrated once, after it settles.
+        let start = ObjectPose(position: Vec3(0, 0, -2), rotation: Quat(0, 0, 0, 1), dimensions: Vec3(1.2, 0.75, 0.8))
+        var buf = EditNarrationBuffer(settle: 0.8)
+        var prev = start
+        for i in 1...10 {
+            var next = prev
+            next.position.x = Double(i) * 0.05
+            buf.record(objectId: "t", actor: "Sam", name: "Table 1", from: prev, to: next, now: Double(i) * 0.15)
+            prev = next
+        }
+        check(buf.flush(now: 1.6).isEmpty, "gesture not narrated while still moving")
+        let g = buf.flush(now: 2.5)
+        check(g.count == 1 && g[0].steps == [NarrationStep(concept: .axis, text: "moved Table 1 50 cm along the red X axis (left/right)", shortcut: "G X 0.5")],
+              "one caption for the whole drag")
+        check(buf.flush(now: 9).isEmpty, "gesture narrated only once")
+    }
+
+    func proposalMessages() throws {
+        let fx = try json("messages.json")
+        var sawProposal = false, sawResolved = false
+        for s in fx["server"] as! [[String: Any]] {
+            let data = try JSONSerialization.data(withJSONObject: s["message"]!)
+            switch try ServerMessageDecoder.decode(data).1 {
+            case .objectUpserted(let o) where o.proposal != nil:
+                sawProposal = o.kind == .couch && o.proposal?.byName == "Maya" && o.proposal?.novice.position == Vec3(0.5, -1.2, -2.5)
+            case .proposalResolved(let r):
+                sawResolved = r.outcome == .adjusted && r.after?.position == Vec3(0.5, -1.2, -2.2) && r.note?.isEmpty == false
+            default: break
+            }
+        }
+        check(sawProposal, "decode object.created proposal")
+        check(sawResolved, "decode proposal.resolved")
+        // The novice's proposal encodes exactly like the shared fixture.
+        let fixture = (fx["validClient"] as! [[String: Any]]).first { ($0["name"] as! String) == "object.propose couch" }!["message"] as! [String: Any]
+        let input = ObjectInput(id: "9a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d", kind: .couch, name: "Couch", position: Vec3(0.5, -1.2, -2.5),
+                                rotation: Quat(0, 0, 0, 1), dimensions: Vec3(2, 0.85, 0.9), color: "#5b7c99", textureRef: nil)
+        let (_, data) = try MessageEncoder.encode(type: "object.propose", payload: ProposePayload(object: input),
+                                                  roomId: "r_test", clientId: "c_host", originEpoch: 1, messageId: "m-13")
+        let ours = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        check(ours.isEqual(to: fixture), "encoded object.propose equals fixture")
+        let (_, upd) = try MessageEncoder.encode(type: "object.update", payload: ObjectUpdatePayload(id: "x", baseRevision: 2, patch: .init(rotation: Quat(0, 1, 0, 0))),
+                                                 roomId: "r", clientId: "c", originEpoch: 1)
+        let u = String(decoding: upd, as: UTF8.self)
+        check(u.contains(#""patch":{"rotation":[0,1,0,0]}"#) && u.contains(#""originEpoch":1"#), "update patch only carries changed fields")
     }
 }

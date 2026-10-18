@@ -4,7 +4,25 @@ import type { Axis, Quat, Vec3 } from "./geometry.js";
 export const PROTOCOL_VERSION = 1;
 
 export type Role = "host" | "expert" | "viewer";
-export type ObjectKind = "pillar" | "partition" | "panel";
+
+/** Must match protocol/catalog.json (checked by test/catalog.test.ts). */
+export const OBJECT_KINDS = [
+  "pillar",
+  "partition",
+  "door",
+  "window",
+  "table",
+  "chair",
+  "couch",
+  "cabinet",
+  "lamp",
+  "tv",
+  "panel",
+  "block",
+] as const;
+export type ObjectKind = (typeof OBJECT_KINDS)[number];
+/** Kinds whose footprint is a circle: dimensions[0] (diameter) must equal dimensions[2]. */
+export const ROUND_KINDS: ReadonlySet<ObjectKind> = new Set<ObjectKind>(["pillar", "lamp"]);
 
 export type ErrorCode =
   | "bad_request"
@@ -41,7 +59,7 @@ const shortId = z.string().min(1).max(64);
 
 export const objectInputSchema = z.strictObject({
   id: z.string().regex(UUID_RE, "must be a UUID"),
-  kind: z.enum(["pillar", "partition", "panel"]),
+  kind: z.enum(OBJECT_KINDS),
   name: z.string().trim().min(1).max(60),
   position: vec3,
   rotation: quat,
@@ -76,6 +94,9 @@ const payloadSchemas = {
     patch: objectPatchSchema,
   }),
   "object.delete": z.strictObject({ id: z.string().regex(UUID_RE) }),
+  "object.propose": z.strictObject({ object: objectInputSchema }),
+  "proposal.accept": z.strictObject({ id: z.string().regex(UUID_RE), note: z.string().trim().min(1).max(300).optional() }),
+  "proposal.reject": z.strictObject({ id: z.string().regex(UUID_RE), note: z.string().trim().min(1).max(300).optional() }),
   selection: z.strictObject({ objectId: z.union([z.null(), z.string().regex(UUID_RE)]) }),
   "comment.add": z.strictObject({
     objectId: z.union([z.null(), z.string().regex(UUID_RE)]),
@@ -114,6 +135,7 @@ export type Payload<T extends ClientType> = z.infer<(typeof payloadSchemas)[T]>;
 /** Messages whose geometry is only meaningful in the current AR origin epoch. */
 export const EPOCH_BOUND: ReadonlySet<ClientType> = new Set<ClientType>([
   "object.create",
+  "object.propose",
   "object.update",
   "guidance.set",
   "guidance.begin",
@@ -134,8 +156,12 @@ export const PERMISSIONS: Record<ClientType, readonly Role[]> = {
   "guidance.attempt": ["host"],
   "guidance.reset": ["host", "expert"],
   "object.create": ["expert"],
-  "object.update": ["expert"],
-  "object.delete": ["expert"],
+  "object.propose": ["host"],
+  // The host may only update or withdraw its own pending proposals (checked in Room).
+  "object.update": ["expert", "host"],
+  "object.delete": ["expert", "host"],
+  "proposal.accept": ["expert"],
+  "proposal.reject": ["expert"],
   "guidance.set": ["expert"],
   "guidance.begin": ["expert"],
   "guidance.approve": ["expert"],
@@ -213,8 +239,8 @@ export function validateDimensions(kind: ObjectKind, d: Vec3): void {
       throw new ProtocolError("invalid_dimensions", `Each dimension must be between ${DIM_MIN} and ${DIM_MAX} m`);
     }
   }
-  if (kind === "pillar" && Math.abs(d[0] - d[2]) > PILLAR_ROUND_TOLERANCE) {
-    throw new ProtocolError("invalid_dimensions", "Pillar must be round: dimensions[0] (diameter) must equal dimensions[2]");
+  if (ROUND_KINDS.has(kind) && Math.abs(d[0] - d[2]) > PILLAR_ROUND_TOLERANCE) {
+    throw new ProtocolError("invalid_dimensions", `A ${kind} must be round: dimensions[0] (diameter) must equal dimensions[2]`);
   }
 }
 

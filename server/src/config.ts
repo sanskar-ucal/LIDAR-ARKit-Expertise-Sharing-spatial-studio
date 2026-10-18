@@ -68,6 +68,7 @@ export const LIMITS = {
   scanStagingTtlMs: 120_000,
   scanMaxCoordinate: 50,
   maxObjects: 50,
+  maxPendingProposals: 12,
   maxComments: 200,
   snapshotComments: 100,
   dedupeEntries: 1000,

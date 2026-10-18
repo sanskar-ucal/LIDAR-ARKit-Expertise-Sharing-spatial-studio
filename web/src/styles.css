@@ -449,6 +449,55 @@ label {
 .plan-obj.dim {
   opacity: 0.4;
 }
+.plan-obj.proposed {
+  opacity: 0.55;
+  stroke-dasharray: 0.06 0.04;
+  stroke-width: 0.025;
+}
+
+.tag.proposal {
+  background: color-mix(in srgb, var(--warn) 14%, white);
+  color: #7a4b0e;
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.feed-item {
+  border-left: 3px solid var(--accent);
+  padding: 0.35rem 0.6rem;
+  background: color-mix(in srgb, var(--accent) 5%, white);
+  border-radius: 6px;
+}
+.feed-item.success {
+  border-left-color: var(--good);
+}
+.feed-item.warning {
+  border-left-color: var(--warn);
+}
+.feed-item .shortcut {
+  margin-top: 0.15rem;
+}
+.feed-item .note {
+  margin-top: 0.2rem;
+  font-style: italic;
+}
+kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 0.35em;
+  margin: 0 0.1em;
+  border: 1px solid #b9b4aa;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fbfaf7;
+  font: 600 0.78rem ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+}
 .plan-ghost {
   opacity: 0.35;
   stroke: var(--accent);

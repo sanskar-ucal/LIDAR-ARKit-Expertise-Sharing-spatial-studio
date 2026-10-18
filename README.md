@@ -2,9 +2,11 @@
 
 RoomBridge connects three people around one room:
 
-- **Novice (iPhone with LiDAR):** scans the room, optionally shares a low-frame-rate live preview, and physically moves design objects into place with a hold-to-move gesture and haptic confirmation.
-- **Expert (Blender):** gets the room scan as a locked reference mesh, places pillars, partitions and picture panels, and guides the novice by setting a target on one axis and approving the result.
-- **Family (any browser):** watches the preview, sees the objects on a plan view, follows plain-language guidance captions, and leaves likes and object-linked comments.
+- **Novice (iPhone with LiDAR):** scans the room, optionally shares a low-frame-rate live preview, physically moves design objects into place with a hold-to-move gesture and haptic confirmation, and **learns CAD while doing it**: every edit is explained with the Blender keys that would do it (for example "moved Table 1 50 cm along the red X axis — `G X 0.5`"), and the novice can propose furniture from an object library for the expert to review.
+- **Expert (Blender):** gets the room scan as a locked reference mesh, places structure and furniture (pillars, partitions, doorways, windows, tables, chairs, couches, cabinets, lamps, TVs, pictures, custom blocks), reviews the novice's proposals (adjust, then accept or reject with a note), and guides the novice by setting a target on one axis and approving the result.
+- **Family (any browser):** watches the preview, sees the objects on a plan view, follows plain-language guidance captions and the CAD lesson feed, and leaves likes and object-linked comments.
+
+The expert stays in the loop at every stage: the novice watches the expert demonstrate (narrated), practises a constrained move (guidance), then proposes their own pieces, and every proposal is reviewed by the expert, whose changes are explained back to the novice.
 
 A small Node.js server on your Mac relays everything over the local Wi-Fi network. Nothing is deployed publicly, nothing is recorded, and scans live only in server memory while a room is open.
 
@@ -58,13 +60,14 @@ Use that address everywhere below (`10.0.0.61` is just an example; yours will di
 
 1. **Server** on the Mac: `npm start` (above).
 2. **iPhone app:** enter `http://10.0.0.61:8787` and your name, tap **Create room (LiDAR scan)**. Allow camera and local network access when asked. See [docs/ios-setup.md](docs/ios-setup.md) to build and install the app.
-3. **Invite people** from the phone (QR icon):
+3. **Invite people** from the phone (**More › Invite people**):
    - *Expert invite* → paste into the Blender add-on's **Invite** field and press **Connect** ([docs/blender-setup.md](docs/blender-setup.md)). This link grants editing rights; only send it to the designer.
    - *Viewer link / QR code* → family opens it in a browser and enters their name.
 4. **Scan:** walk slowly around the area, then tap **Send room**. The expert sees the mesh appear in Blender in the `RoomBridge Room Scan (reference)` collection.
 5. **Preview (optional):** tap **Share preview** on the phone. It is off by default.
-6. **Design:** the expert adds pillars, partitions, and picture panels from the RoomBridge sidebar; they appear in AR on the phone and on the family plan view.
-7. **Guide:** the expert selects an object, **Place Target Ghost**, moves the ghost along one axis, **Send Target**, **Begin**. The novice holds **Hold to move** and walks the phone along the coloured line; the phone buzzes once when within tolerance. The novice taps **Done — ask the expert to check**, and the expert presses **Approve** (or **Reset Attempt**).
+6. **Design:** the expert adds objects from the RoomBridge sidebar's **Design Objects** library; they appear in AR on the phone and on the family plan view, and the phone narrates each edit as a CAD lesson (tap the toast or the graduation-cap button for the **Learn** sheet and the CAD skills checklist).
+7. **Propose:** the novice taps **＋ (Add object)**, picks a piece, aims the dot at the floor or a wall, and taps **Place & propose**. They can move it to the dot, turn it and resize it while it waits (a custom block can also be recoloured and named). The expert reviews it under **Novice Proposals** in Blender: adjust, then **Accept** or **Reject** with an optional note. The phone buzzes and explains what the expert changed.
+8. **Guide:** the expert selects an object, **Place Target Ghost**, moves the ghost along one axis, **Send Target**, **Begin**. The novice holds **Hold to move** and walks the phone along the coloured line; the phone buzzes once when within tolerance. The novice taps **Done — ask the expert to check**, and the expert presses **Approve** (or **Reset Attempt**).
 
 ### Without an iPhone
 
@@ -72,10 +75,10 @@ Use that address everywhere below (`10.0.0.61` is just an example; yours will di
 - **Synthetic preview host** (no phone at all): with the server running,
 
   ```bash
-  npm run synthetic-frames -w server -- --server http://127.0.0.1:8787 --fps 5 --objects
+  npm run synthetic-frames -w server -- --server http://127.0.0.1:8787 --fps 5 --objects --propose
   ```
 
-  creates a room, prints a viewer link and an expert invite, streams pre-rendered frames that say **SYNTHETIC TEST FRAME** (also flagged synthetic in each frame header), and with `--objects` adds one object of each kind. Ctrl-C ends the room.
+  creates a room, prints a viewer link and an expert invite, streams pre-rendered frames that say **SYNTHETIC TEST FRAME** (also flagged synthetic in each frame header), with `--objects` adds a pillar, a partition and a picture as an expert, and with `--propose` proposes a table and a chair as the host so you can try the Blender review panel. Ctrl-C ends the room.
 
 Neither mode is evidence that the LiDAR or device path works; see [docs/status.md](docs/status.md).
 

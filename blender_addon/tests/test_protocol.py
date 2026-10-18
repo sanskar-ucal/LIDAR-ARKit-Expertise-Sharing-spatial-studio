@@ -12,7 +12,7 @@ class ProtocolFixtures(unittest.TestCase):
     def test_valid_object_payloads_pass_local_validation(self):
         for case in FX["validClient"]:
             m = case["message"]
-            if m["type"] == "object.create":
+            if m["type"] in ("object.create", "object.propose"):
                 with self.subTest(case["name"]):
                     protocol.validate_object_input(m["payload"]["object"])
 
