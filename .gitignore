@@ -17,6 +17,8 @@ xcuserdata/
 
 # Build artifacts
 build/
+# Copied in by scripts/package-addon.sh; the source of truth is protocol/catalog.json
+blender_addon/roombridge/catalog.json
 
 # Never commit captured scans or frames
 *.rbsc

@@ -1,0 +1,138 @@
+{
+  "description": "RoomBridge object catalog (protocol v1). Every client builds each kind from these parts, so the phone, Blender and the browser show the same shape. Parts live in a unit box in canonical local axes (+Y up, +Z front): x and z in [-0.5, 0.5]; y in [0, 1] for origin 'bottom', in [-0.5, 0.5] for origin 'center'. Each part is then scaled by the object's dimensions. Shapes: box; cylinder (axis +Y, may be elliptical); sphere (may be an ellipsoid). Tints: 'base' (object colour), 'dark' (base x 0.55), 'light' (base mixed 50% with white) or a fixed '#rrggbb'. 'mount' says where a novice places it from the phone: on the floor, or against a wall (facing out). 'height' is the default height of the origin above the floor.",
+  "version": 1,
+  "kinds": [
+    {
+      "kind": "pillar", "label": "Pillar", "group": "Structure", "icon": "cylinder", "blenderIcon": "MESH_CYLINDER",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [0.3, 2.4, 0.3], "color": "#c9b79c", "round": true,
+      "parts": [{ "shape": "cylinder", "center": [0, 0.5, 0], "size": [1, 1, 1], "tint": "base" }],
+      "lesson": "A pillar is a single cylinder. Its size is a diameter and a height.",
+      "blender": "Shift+A › Mesh › Cylinder, then S Z to set the height"
+    },
+    {
+      "kind": "partition", "label": "Partition", "group": "Structure", "icon": "rectangle.portrait", "blenderIcon": "MESH_CUBE",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [1.2, 2.0, 0.1], "color": "#d8cfc0", "round": false,
+      "parts": [{ "shape": "box", "center": [0, 0.5, 0], "size": [1, 1, 1], "tint": "base" }],
+      "lesson": "A partition is one stretched cube: wide, tall and thin.",
+      "blender": "Shift+A › Mesh › Cube, then S X, S Y and S Z for width, depth and height"
+    },
+    {
+      "kind": "door", "label": "Doorway", "group": "Structure", "icon": "door.left.hand.closed", "blenderIcon": "MESH_PLANE",
+      "origin": "bottom", "mount": "wall", "height": 0, "dimensions": [0.9, 2.1, 0.12], "color": "#a07850", "round": false,
+      "parts": [
+        { "shape": "box", "center": [-0.47, 0.5, 0], "size": [0.06, 1, 1], "tint": "dark" },
+        { "shape": "box", "center": [0.47, 0.5, 0], "size": [0.06, 1, 1], "tint": "dark" },
+        { "shape": "box", "center": [0, 0.97, 0], "size": [1, 0.06, 1], "tint": "dark" },
+        { "shape": "box", "center": [0, 0.47, 0], "size": [0.88, 0.94, 0.4], "tint": "base" },
+        { "shape": "sphere", "center": [0.33, 0.48, 0.32], "size": [0.06, 0.025, 0.45], "tint": "#c9a227" }
+      ],
+      "lesson": "A doorway is a frame of three thin boxes around a slab, plus a round knob.",
+      "blender": "Cube for the slab, Shift+D to duplicate frame pieces, G to snap them around it"
+    },
+    {
+      "kind": "window", "label": "Window", "group": "Structure", "icon": "window.vertical.closed", "blenderIcon": "MESH_GRID",
+      "origin": "center", "mount": "wall", "height": 1.4, "dimensions": [1.2, 1.2, 0.1], "color": "#f2f2f2", "round": false,
+      "parts": [
+        { "shape": "box", "center": [-0.47, 0, 0], "size": [0.06, 1, 1], "tint": "base" },
+        { "shape": "box", "center": [0.47, 0, 0], "size": [0.06, 1, 1], "tint": "base" },
+        { "shape": "box", "center": [0, 0.47, 0], "size": [1, 0.06, 1], "tint": "base" },
+        { "shape": "box", "center": [0, -0.47, 0], "size": [1, 0.06, 1], "tint": "base" },
+        { "shape": "box", "center": [0, 0, 0], "size": [0.03, 0.88, 0.8], "tint": "base" },
+        { "shape": "box", "center": [0, 0, 0], "size": [0.88, 0.03, 0.8], "tint": "base" },
+        { "shape": "box", "center": [0, 0, 0], "size": [0.88, 0.88, 0.2], "tint": "#9ec9e8" },
+        { "shape": "box", "center": [0, -0.52, 0.3], "size": [1.1, 0.04, 1.6], "tint": "dark" }
+      ],
+      "lesson": "A window is a frame, two crossing bars, a glass pane and a sill.",
+      "blender": "Cube for the frame, Inset (I) on its front face to cut the opening"
+    },
+    {
+      "kind": "table", "label": "Table", "group": "Furniture", "icon": "table.furniture", "blenderIcon": "MESH_CUBE",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [1.2, 0.75, 0.8], "color": "#a0764f", "round": false,
+      "parts": [
+        { "shape": "box", "center": [0, 0.96, 0], "size": [1, 0.08, 1], "tint": "base" },
+        { "shape": "box", "center": [-0.45, 0.46, -0.42], "size": [0.06, 0.92, 0.08], "tint": "dark" },
+        { "shape": "box", "center": [0.45, 0.46, -0.42], "size": [0.06, 0.92, 0.08], "tint": "dark" },
+        { "shape": "box", "center": [-0.45, 0.46, 0.42], "size": [0.06, 0.92, 0.08], "tint": "dark" },
+        { "shape": "box", "center": [0.45, 0.46, 0.42], "size": [0.06, 0.92, 0.08], "tint": "dark" }
+      ],
+      "lesson": "A table is five boxes: a flat top and four legs.",
+      "blender": "Cube scaled flat for the top (S Z 0.1), then Shift+D a leg and move it with G X / G Y"
+    },
+    {
+      "kind": "chair", "label": "Chair", "group": "Furniture", "icon": "chair", "blenderIcon": "MESH_CUBE",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [0.45, 0.9, 0.5], "color": "#7a8b99", "round": false,
+      "parts": [
+        { "shape": "box", "center": [0, 0.5, 0.04], "size": [1, 0.06, 0.92], "tint": "base" },
+        { "shape": "box", "center": [0, 0.76, -0.44], "size": [1, 0.48, 0.08], "tint": "base" },
+        { "shape": "box", "center": [-0.44, 0.24, -0.42], "size": [0.08, 0.48, 0.07], "tint": "dark" },
+        { "shape": "box", "center": [0.44, 0.24, -0.42], "size": [0.08, 0.48, 0.07], "tint": "dark" },
+        { "shape": "box", "center": [-0.44, 0.24, 0.42], "size": [0.08, 0.48, 0.07], "tint": "dark" },
+        { "shape": "box", "center": [0.44, 0.24, 0.42], "size": [0.08, 0.48, 0.07], "tint": "dark" }
+      ],
+      "lesson": "A chair is a table with a back: a seat, a backrest and four legs.",
+      "blender": "Start from a table, scale it down (S 0.5) and Shift+D the top into a backrest"
+    },
+    {
+      "kind": "couch", "label": "Couch", "group": "Furniture", "icon": "sofa", "blenderIcon": "MESH_CUBE",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [2.0, 0.85, 0.9], "color": "#5b7c99", "round": false,
+      "parts": [
+        { "shape": "box", "center": [0, 0.15, 0.02], "size": [1, 0.24, 0.96], "tint": "dark" },
+        { "shape": "box", "center": [-0.23, 0.36, 0.08], "size": [0.45, 0.18, 0.8], "tint": "base" },
+        { "shape": "box", "center": [0.23, 0.36, 0.08], "size": [0.45, 0.18, 0.8], "tint": "base" },
+        { "shape": "box", "center": [0, 0.62, -0.38], "size": [1, 0.62, 0.22], "tint": "base" },
+        { "shape": "box", "center": [-0.47, 0.37, 0.02], "size": [0.06, 0.5, 0.96], "tint": "dark" },
+        { "shape": "box", "center": [0.47, 0.37, 0.02], "size": [0.06, 0.5, 0.96], "tint": "dark" }
+      ],
+      "lesson": "A couch is a base, two seat cushions, a back and two arms, all boxes.",
+      "blender": "Block it out with cubes first, then soften the edges with Bevel (Ctrl+B)"
+    },
+    {
+      "kind": "cabinet", "label": "Cabinet", "group": "Furniture", "icon": "cabinet", "blenderIcon": "MESH_CUBE",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [0.8, 1.8, 0.45], "color": "#d9cbb4", "round": false,
+      "parts": [
+        { "shape": "box", "center": [0, 0.5, 0], "size": [1, 1, 1], "tint": "base" },
+        { "shape": "box", "center": [0, 0.5, 0.505], "size": [0.012, 0.96, 0.02], "tint": "dark" },
+        { "shape": "box", "center": [-0.07, 0.55, 0.53], "size": [0.03, 0.12, 0.06], "tint": "#4a4a4a" },
+        { "shape": "box", "center": [0.07, 0.55, 0.53], "size": [0.03, 0.12, 0.06], "tint": "#4a4a4a" }
+      ],
+      "lesson": "A cabinet is a tall box whose front is split into two doors with handles.",
+      "blender": "One cube for the body; Loop Cut (Ctrl+R) splits the front into two doors"
+    },
+    {
+      "kind": "lamp", "label": "Lamp", "group": "Lighting & decor", "icon": "lamp.floor", "blenderIcon": "LIGHT_POINT",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [0.4, 1.6, 0.4], "color": "#f3e3c3", "round": true,
+      "parts": [
+        { "shape": "cylinder", "center": [0, 0.015, 0], "size": [0.7, 0.03, 0.7], "tint": "#3a3a3a" },
+        { "shape": "cylinder", "center": [0, 0.42, 0], "size": [0.06, 0.8, 0.06], "tint": "#3a3a3a" },
+        { "shape": "sphere", "center": [0, 0.8, 0], "size": [0.25, 0.06, 0.25], "tint": "#fff6c8" },
+        { "shape": "cylinder", "center": [0, 0.89, 0], "size": [1, 0.22, 1], "tint": "base" }
+      ],
+      "lesson": "A lamp is three cylinders (base, pole and shade) around a bulb.",
+      "blender": "Shift+A › Cylinder three times, sizing each with S and S Z"
+    },
+    {
+      "kind": "tv", "label": "TV", "group": "Lighting & decor", "icon": "tv", "blenderIcon": "MESH_PLANE",
+      "origin": "center", "mount": "wall", "height": 1.2, "dimensions": [1.2, 0.7, 0.06], "color": "#1d1f24", "round": false,
+      "parts": [
+        { "shape": "box", "center": [0, 0, 0], "size": [1, 1, 1], "tint": "base" },
+        { "shape": "box", "center": [0, 0.02, 0.51], "size": [0.94, 0.86, 0.02], "tint": "#26384d" }
+      ],
+      "lesson": "A TV is a thin dark box with a screen inset on its front face.",
+      "blender": "Cube scaled thin (S Y 0.05), then Inset (I) on the front face for the screen"
+    },
+    {
+      "kind": "panel", "label": "Picture", "group": "Lighting & decor", "icon": "photo.artframe", "blenderIcon": "IMAGE_DATA",
+      "origin": "center", "mount": "wall", "height": 1.4, "dimensions": [0.8, 0.6, 0.03], "color": "#ffffff", "round": false,
+      "parts": [{ "shape": "box", "center": [0, 0, 0], "size": [1, 1, 1], "tint": "base" }],
+      "lesson": "A picture is a thin box with an image on its front face.",
+      "blender": "Cube scaled thin (S Y 0.03), then an Image Texture on the front face"
+    },
+    {
+      "kind": "block", "label": "Custom block", "group": "Custom", "icon": "cube", "blenderIcon": "MESH_CUBE",
+      "origin": "bottom", "mount": "floor", "height": 0, "dimensions": [0.6, 0.6, 0.6], "color": "#b48ead", "round": false,
+      "parts": [{ "shape": "box", "center": [0, 0.5, 0], "size": [1, 1, 1], "tint": "base" }],
+      "lesson": "Your own design: one box you size yourself. Every CAD model starts like this.",
+      "blender": "Shift+A › Mesh › Cube, then S X / S Y / S Z to give it your dimensions"
+    }
+  ]
+}

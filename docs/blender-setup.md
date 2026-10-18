@@ -31,9 +31,9 @@ The credential is stored on the window manager, so it is not saved into your `.b
 
 ## What syncs
 
-- Objects in the **RoomBridge Design** collection that the add-on created: **Pillar**, **Partition**, **Picture** (a panel with a sample picture on its front face).
-- Move (G), rotate (R) and scale (S) in Object Mode, and delete (X). Changes stream while you drag (about 7 updates per second) and settle 0.1 s after you stop.
-- Pillars stay round: X and Y scale are kept equal.
+- Objects in the **RoomBridge Design** collection that the add-on created, from the **Design Objects** library: Structure (Pillar, Partition, Doorway, Window), Furniture (Table, Chair, Couch, Cabinet), Lighting & decor (Lamp, TV, Picture) and Custom (Custom block). Each is built from simple boxes, cylinders and spheres defined in [protocol/catalog.json](../protocol/catalog.json), so the phone shows exactly the same shape. Hover a button to see its CAD lesson. Wall items (window, TV, picture) start at their usual height; everything else stands on the detected floor.
+- Move (G), rotate (R) and scale (S) in Object Mode, and delete (X). Changes stream while you drag (about 7 updates per second) and settle 0.1 s after you stop. The phone narrates each finished edit to the novice in Blender terms ("moved Table 1 50 cm along the red X axis — G X 0.5").
+- Pillars and lamps stay round: X and Y scale are kept equal.
 - Not synced (local only): edit-mode mesh changes, modifiers, parenting, materials, animation, negative scale.
 
 All network I/O happens on a background thread; every change to the Blender scene happens on the main thread via a 50 ms timer, so Blender stays responsive even when the network is slow.
@@ -45,6 +45,16 @@ Canonical room space is the phone's ARKit world (Y up, metres). Blender is Z up,
 ## Room scan
 
 When the phone sends a scan, it appears in the **RoomBridge Room Scan (reference)** collection, locked (not selectable) and approximate. **Re-import Scan** fetches it again. If the phone resets its AR origin, objects from the old origin are shown as wireframes and marked stale; place them where they belong in the new scan and press **Confirm Positions for New Scan**.
+
+## Review the novice's proposals
+
+The novice can place pieces from the phone's object library. They arrive outlined and labelled (wireframe overlay, name shown in front) and are listed under **Novice Proposals**, with a notice in the main panel.
+
+1. **Select** a proposal to inspect it. Adjust it with G, R or S if it needs fixing; the novice sees it move.
+2. Optionally type a **Note** (for example "Moved it back so the door can open").
+3. **Accept** keeps it, including your changes, and it becomes a normal design object. **Reject** removes it. Deleting a proposal with X also counts as a rejection.
+
+The novice's phone confirms with a haptic and explains what you changed in Blender keys, together with your note. Accept a proposal before using it in a guidance exercise.
 
 ## Guide the novice
 
@@ -67,4 +77,12 @@ The pure-Python modules (`coords`, `protocol`, `tracker`, `scan_format`, `ws_cli
 python3 -m unittest discover -s blender_addon/tests -t blender_addon
 ```
 
-This includes an end-to-end test that starts the real server (needs `npm ci` first). The `bpy`-dependent modules (`sync`, `primitives`, `ui`) can only be exercised inside Blender; see [device-checklist.md](device-checklist.md).
+This includes an end-to-end test that starts the real server (needs `npm ci` first).
+
+The `bpy`-dependent modules (`sync`, `primitives`, `ui`) are exercised headless inside real Blender against the real server, with a scripted phone:
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python blender_addon/tests/blender_e2e.py
+```
+
+It covers connecting from an invite, scan import, every catalog kind, transform sync, guidance, proposals (accept with an adjustment and a note, reject), and drawing every panel against a stand-in layout. Real panel drawing and clicking still need the GUI; see [device-checklist.md](device-checklist.md).

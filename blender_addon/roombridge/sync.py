@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import bpy
 
-from . import coords, primitives, protocol, scan_format
+from . import catalog, coords, primitives, protocol, scan_format
 from .session import RoomSession
 from .tracker import SyncTracker
 
@@ -46,6 +46,8 @@ class Controller:
         self.applying = False
         self.last_target_sig: Any = None
         self.approving_object = ""
+        self.last_info = ""
+        self.proposal_log: List[Dict[str, Any]] = []
         self.floor_z = 0.0
         self.foreign_objects = 0
 
@@ -218,10 +220,15 @@ def _handle(s: RoomSession, msg: Dict[str, Any]) -> None:
             # Approval moves the object server-side; it is not an echo of a local edit.
             ctrl.approving_object = ""
             from_me = False
+        if t == "object.created" and o.get("proposal") and not from_me:
+            ctrl.last_info = f"{o['proposal']['byName']} proposed “{o['name']}”. Review it under Novice Proposals."
         if ctrl.tracker.on_server_object(o, from_me):
             _apply_object(o)
         else:
             _set_stale_display(o)
+    elif t == "proposal.resolved":
+        ctrl.proposal_log.insert(0, p)
+        del ctrl.proposal_log[6:]
     elif t == "object.deleted":
         oid = p["id"]
         ctrl.server_objects.pop(oid, None)
@@ -356,13 +363,13 @@ def read_state(obj: bpy.types.Object) -> Optional[Dict[str, Any]]:
     sx, sy, sz = obj.scale
     if min(sx, sy, sz) <= 0:
         raise protocol.ValidationError("negative or zero scale is not supported; use positive dimensions")
-    if kind == "pillar" and abs(sx - sy) > 1e-4:
-        # Keep pillars round: take whichever horizontal axis the expert just changed.
+    if kind in catalog.ROUND_KINDS and abs(sx - sy) > 1e-4:
+        # Keep round kinds round: take whichever horizontal axis the expert just changed.
         prev = ctrl.server_objects.get(obj.get("rb_id", ""), {}).get("dimensions", [sx])[0]
         d = sx if abs(sx - prev) > abs(sy - prev) else sy
         _guarded(lambda: setattr(obj, "scale", (d, d, sz)))
         sx = sy = d
-        ctrl.last_error = "Pillars stay round: diameter applied to both X and Y."
+        ctrl.last_error = f"A {catalog.get(kind)['label'].lower()} stays round: diameter applied to both X and Y."
     # matrix_world is only refreshed on depsgraph evaluation; matrix_basis reflects
     # location/rotation/scale immediately (e.g. right after create or apply).
     matrix = obj.matrix_basis if obj.parent is None else obj.parent.matrix_world @ obj.matrix_parent_inverse @ obj.matrix_basis
@@ -419,6 +426,13 @@ def _set_stale_display(o: Dict[str, Any], obj: Optional[bpy.types.Object] = None
     if bool(obj.get("rb_stale", False)) != stale:
         obj["rb_stale"] = stale
         obj.display_type = "WIRE" if stale else "TEXTURED"
+    proposed = o.get("proposal") is not None
+    if bool(obj.get("rb_proposal", False)) != proposed:
+        # A novice's proposal: outlined and labelled until the expert accepts or rejects it.
+        obj["rb_proposal"] = proposed
+        obj.show_wire = proposed
+        obj.show_name = proposed
+        obj.show_in_front = proposed
 
 
 def create_object(kind: str, location_b) -> bpy.types.Object:
@@ -437,10 +451,11 @@ def create_object(kind: str, location_b) -> bpy.types.Object:
     obj["rb_texture"] = "sample:picture" if kind == "panel" else ""
     obj.rotation_mode = "QUATERNION"
     loc = list(location_b)
-    if kind == "panel":
-        loc[2] = max(loc[2], ctrl.floor_z + 1.4)  # hang pictures at eye height by default
+    spec = catalog.get(kind)
+    if spec["origin"] == "center":
+        loc[2] = max(loc[2], ctrl.floor_z + spec["height"])  # wall items (pictures, TVs, windows) at their usual height
     else:
-        loc[2] = ctrl.floor_z  # floor-standing primitives sit on the scanned floor
+        loc[2] = ctrl.floor_z  # floor-standing objects sit on the scanned floor
     obj.location = loc
     obj.scale = coords.dims_to_blender_scale(dims)
     primitives.apply_materials(obj, kind, obj["rb_color"], obj["rb_texture"] or None)
@@ -681,6 +696,30 @@ def send_target(design_obj: bpy.types.Object, axis_choice: str, tolerance: float
     s.send("guidance.set", {"objectId": oid, "axis": axis, "targetPosition": list(snapped), "tolerance": tolerance},
            origin_epoch=ctrl.origin_epoch)
     return "Target sent" + note
+
+
+def pending_proposals() -> List[Dict[str, Any]]:
+    return sorted((o for o in ctrl.server_objects.values() if o.get("proposal")), key=lambda o: o["proposal"]["proposedAt"])
+
+
+def proposal_command(msg_type: str, oid: str, note: str = "") -> str:
+    """Accept or reject a novice's proposal. Local edits to it are sent first, so the
+    novice is told about the expert's adjustment."""
+    s = ctrl.session
+    o = ctrl.server_objects.get(oid)
+    if s is None or o is None or not o.get("proposal"):
+        return "That proposal is no longer pending"
+    t = ctrl.tracker.objects.get(oid)
+    if t is not None:
+        t.last_change -= 1.0  # treat any recent drag as settled so it is published now
+    _scan_local_changes()
+    _flush()
+    payload: Dict[str, Any] = {"id": oid}
+    if note.strip():
+        payload["note"] = note.strip()[:300]
+    s.send(msg_type, payload)
+    verb = "Accepted" if msg_type == "proposal.accept" else "Rejected"
+    return f"{verb} {o['proposal']['byName']}’s “{o['name']}”"
 
 
 def guidance_command(msg_type: str) -> str:

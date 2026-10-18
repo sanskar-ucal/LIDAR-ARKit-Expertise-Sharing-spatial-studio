@@ -7,12 +7,14 @@ import re
 import uuid
 from typing import Any, Dict, Optional
 
+from . import catalog
+
 PROTOCOL_VERSION = 1
-KINDS = ("pillar", "partition", "panel")
+KINDS = catalog.KINDS
 TEXTURES = (None, "sample:picture")
 DIM_MIN, DIM_MAX = 0.01, 20.0
 POS_MAX = 100.0
-EPOCH_BOUND = {"object.create", "object.update", "guidance.set", "guidance.begin", "guidance.attempt"}
+EPOCH_BOUND = {"object.create", "object.propose", "object.update", "guidance.set", "guidance.begin", "guidance.attempt"}
 
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 _COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -82,8 +84,8 @@ def validate_dimensions(kind: str, d) -> None:
     for c in d:
         if not (DIM_MIN <= c <= DIM_MAX):
             raise ValidationError(f"dimensions must be between {DIM_MIN} and {DIM_MAX} m (got {c:.3f})")
-    if kind == "pillar" and abs(d[0] - d[2]) > 0.001:
-        raise ValidationError("pillars must be round (equal X and Y scale in Blender)")
+    if kind in catalog.ROUND_KINDS and abs(d[0] - d[2]) > 0.001:
+        raise ValidationError(f"a {kind} must be round (equal X and Y scale in Blender)")
 
 
 def validate_scene_object(o: Dict[str, Any]) -> None:
@@ -106,6 +108,9 @@ def validate_server_message(m: Any) -> Dict[str, Any]:
     p = m["payload"]
     if t in ("object.created", "object.updated"):
         validate_scene_object(p.get("object"))
+    elif t == "proposal.resolved":
+        if p.get("outcome") not in ("accepted", "adjusted", "rejected") or not isinstance(p.get("objectId"), str):
+            raise ValidationError("bad proposal.resolved")
     elif t == "scene.snapshot":
         for o in p.get("objects", []):
             validate_scene_object(o)

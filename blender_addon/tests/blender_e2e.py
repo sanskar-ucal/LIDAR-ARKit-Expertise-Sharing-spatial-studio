@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT / "blender_addon"))
 import bpy  # noqa: E402
 
 import roombridge  # noqa: E402
-from roombridge import primitives, protocol, sync  # noqa: E402
+from roombridge import catalog, primitives, protocol, sync  # noqa: E402
 from roombridge.ws_client import WebSocketClient  # noqa: E402
 
 results = []
@@ -83,6 +83,41 @@ class Phone:
 
     def send(self, t, payload, epoch=None):
         self.ws.send_text(json.dumps(protocol.envelope(t, payload, self.auth["roomId"], self.auth["clientId"], epoch)))
+
+
+class FakeLayout:
+    """Stands in for bpy.types.UILayout (headless Blender cannot draw), recording icons used."""
+
+    def __init__(self, icons_used):
+        self.icons_used = icons_used
+
+    def __getattr__(self, name):
+        def call(*_args, **kwargs):
+            if "icon" in kwargs:
+                self.icons_used.append(kwargs["icon"])
+            return FakeLayout(self.icons_used)
+        return call
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+
+def draw_all_panels():
+    from roombridge import ui
+    used = []
+    errors = []
+    for cls in ui.CLASSES:
+        if not issubclass(cls, bpy.types.Panel):
+            continue
+        if hasattr(cls, "poll") and not cls.poll(bpy.context):
+            continue
+        fake = type("P", (), {"layout": FakeLayout(used)})()
+        try:
+            cls.draw(fake, bpy.context)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{cls.__name__}: {exc!r}")
+    valid = set(bpy.types.UILayout.bl_rna.functions["label"].parameters["icon"].enum_items.keys())
+    return errors, sorted(set(i for i in used if i not in valid))
 
 
 def close(a, b, tol=1e-4):
@@ -199,6 +234,57 @@ def main(base):
     bpy.data.objects.remove(pillar, do_unlink=True)
     dele = phone.wait(lambda m: m["type"] == "object.deleted")
     check(dele["payload"]["id"] == pid, "delete reaches phone")
+
+    # Every catalog kind can be added from Blender and reaches the phone with its default size.
+    icons = set(bpy.types.UILayout.bl_rna.functions["label"].parameters["icon"].enum_items.keys())
+    bad_icons = [k["blenderIcon"] for k in catalog.DATA["kinds"] if k["blenderIcon"] not in icons]
+    check(not bad_icons, f"catalog Blender icons exist {bad_icons}")
+    for k in catalog.DATA["kinds"]:
+        obj = sync.create_object(k["kind"], (2.0, 1.0, 0.0))
+        m = phone.wait(lambda m, oid=obj["rb_id"]: m["type"] == "object.created" and m["payload"]["object"]["id"] == oid)
+        o = m["payload"]["object"]
+        want_y = k["height"] if k["origin"] == "center" else 0.0
+        ok = close(o["dimensions"], k["dimensions"]) and abs(o["position"][1] - want_y) < 1e-4
+        if k["kind"] not in primitives.LEGACY_KINDS:
+            ok = ok and len(obj.data.materials) == len(catalog.tint_order(k["kind"])) and len(obj.data.vertices) >= 8 * len(k["parts"])
+        check(ok, f"{k['kind']}: built from {len(k['parts'])} part(s), reaches phone at height {o['position'][1]:.2f}")
+    table = next(o for o in bpy.data.objects if o.get("rb_kind") == "table")
+    zs = [v.co.z for v in table.data.vertices]
+    check(abs(min(zs)) < 1e-6 and abs(max(zs) - 1.0) < 1e-6, "table mesh spans the unit box (legs on the floor, top at 1)")
+
+    # The novice proposes a couch from the phone; the expert adjusts and accepts it with a note.
+    couch_id = str(uuid.uuid4())
+    phone.send("object.propose", {"object": {"id": couch_id, "kind": "couch", "name": "Couch", "position": [0.5, 0.0, -2.5],
+                                             "rotation": [0, 0, 0, 1], "dimensions": [2.0, 0.85, 0.9], "color": "#5b7c99",
+                                             "textureRef": None}}, 1)
+    check(pump(lambda: couch_id in sync._index()), "novice proposal appears in Blender")
+    couch = sync._index().get(couch_id)
+    if couch:
+        check(couch.get("rb_proposal") and couch.show_wire and couch.show_name, "proposal is outlined and labelled")
+        check(close(couch.location, (0.5, 2.5, 0.0)), "proposal placed where the novice put it")
+        check([o["id"] for o in sync.pending_proposals()] == [couch_id], "proposal listed for review")
+        check("proposed" in sync.ctrl.last_info, "expert is told: " + sync.ctrl.last_info)
+        errors, bad = draw_all_panels()
+        check(not errors and not bad, f"every panel draws (errors {errors}, unknown icons {bad})")
+        couch.location.y += 0.3  # expert pushes it 30 cm further back (canonical -Z)
+        pump(lambda: False, timeout=0.4)
+        msg = sync.proposal_command("proposal.accept", couch_id, "Moved it back so the door can open")
+        check(msg.startswith("Accepted"), msg)
+        res = phone.wait(lambda m: m["type"] == "proposal.resolved" and m["payload"]["objectId"] == couch_id)["payload"]
+        check(res["outcome"] == "adjusted" and close(res["after"]["position"], [0.5, 0, -2.8], 1e-3)
+              and res["note"] == "Moved it back so the door can open", f"novice hears: {res['outcome']} by {res['byName']}")
+        check(pump(lambda: not couch.get("rb_proposal")) and not couch.show_wire, "accepted proposal becomes a normal object")
+
+    chair_id = str(uuid.uuid4())
+    phone.send("object.propose", {"object": {"id": chair_id, "kind": "chair", "name": "Chair", "position": [1.0, 0.0, -1.0],
+                                             "rotation": [0, 0, 0, 1], "dimensions": [0.45, 0.9, 0.5], "color": "#7a8b99",
+                                             "textureRef": None}}, 1)
+    check(pump(lambda: chair_id in sync.ctrl.server_objects), "second proposal arrives")
+    sync.proposal_command("proposal.reject", chair_id, "It blocks the window")
+    res = phone.wait(lambda m: m["type"] == "proposal.resolved" and m["payload"]["objectId"] == chair_id)["payload"]
+    check(res["outcome"] == "rejected" and res["note"] == "It blocks the window", "rejection with a reason reaches the phone")
+    check(pump(lambda: chair_id not in sync._index()), "rejected proposal removed in Blender")
+    check(sync.ctrl.proposal_log and sync.ctrl.proposal_log[0]["outcome"] == "rejected", "Blender keeps a log of decisions")
 
     sync.disconnect()
     roombridge.unregister()

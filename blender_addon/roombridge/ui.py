@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, PointerProperty, StringProperty
 
-from . import coords, protocol, sync
+from . import catalog, coords, protocol, sync
 
 ROLE_LABEL = {"host": "Host (phone)", "expert": "Expert", "viewer": "Family"}
 
@@ -78,6 +78,7 @@ class RBSettings(bpy.types.PropertyGroup):
     )
     tolerance: FloatProperty(name="Tolerance", default=0.05, min=0.01, max=0.5, unit="LENGTH", precision=3)
     status_message: StringProperty(default="")
+    proposal_note: StringProperty(name="Note", description="Optional feedback sent to the novice with Accept or Reject", maxlen=300)
 
 
 class RBPreferences(bpy.types.AddonPreferences):
@@ -157,11 +158,16 @@ class ROOMBRIDGE_OT_add_object(bpy.types.Operator):
     bl_idname = "roombridge.add_object"
     bl_label = "Add RoomBridge object"
     bl_options = {"REGISTER", "UNDO"}
-    kind: EnumProperty(items=[("pillar", "Pillar", ""), ("partition", "Partition", ""), ("panel", "Picture Panel", "")])
+    kind: EnumProperty(items=[(k["kind"], k["label"], k["lesson"]) for k in catalog.DATA["kinds"]])
 
     @classmethod
     def poll(cls, _context):
         return sync.is_connected() and bool(sync.ctrl.room)
+
+    @classmethod
+    def description(cls, _context, properties):
+        k = catalog.get(properties.kind)
+        return f"Add a {k['label'].lower()} at the 3D cursor. {k['lesson']}"
 
     def execute(self, context):
         obj = sync.create_object(self.kind, context.scene.cursor.location)
@@ -176,11 +182,59 @@ def _design_for(context):
     obj = context.active_object
     if obj is None:
         return None
-    if "rb_id" in obj:
-        return obj
     if "rb_target_of" in obj:
-        return sync._index().get(obj["rb_target_of"])
-    return None
+        obj = sync._index().get(obj["rb_target_of"])
+    if obj is None or "rb_id" not in obj:
+        return None
+    if (sync.ctrl.server_objects.get(obj["rb_id"]) or {}).get("proposal"):
+        return None  # accept the novice's proposal before guiding it
+    return obj
+
+
+PROPOSAL_ACTIONS = [
+    ("proposal.accept", "Accept", "Keep it, including any changes you made to it, and tell the novice"),
+    ("proposal.reject", "Reject", "Remove it and tell the novice why (use the note)"),
+]
+
+
+class ROOMBRIDGE_OT_proposal(bpy.types.Operator):
+    bl_idname = "roombridge.proposal"
+    bl_label = "Review Proposal"
+    action: EnumProperty(items=PROPOSAL_ACTIONS)
+    object_id: StringProperty()
+
+    @classmethod
+    def poll(cls, _context):
+        return sync.is_connected()
+
+    @classmethod
+    def description(cls, _context, properties):
+        return {a: d for a, _label, d in PROPOSAL_ACTIONS}[properties.action]
+
+    def execute(self, context):
+        st = _settings(context)
+        msg = sync.proposal_command(self.action, self.object_id, st.proposal_note)
+        st.proposal_note = ""
+        st.status_message = msg
+        self.report({"INFO"}, msg)
+        return {"FINISHED"}
+
+
+class ROOMBRIDGE_OT_select_object(bpy.types.Operator):
+    bl_idname = "roombridge.select_object"
+    bl_label = "Select"
+    bl_description = "Select this object so you can inspect or adjust it (G, R, S) before deciding"
+    object_id: StringProperty()
+
+    def execute(self, context):
+        obj = sync._index().get(self.object_id)
+        if obj is None:
+            return {"CANCELLED"}
+        for o in context.selected_objects:
+            o.select_set(False)
+        obj.select_set(True)
+        context.view_layer.objects.active = obj
+        return {"FINISHED"}
 
 
 class ROOMBRIDGE_OT_place_target(bpy.types.Operator):
@@ -305,6 +359,8 @@ class ROOMBRIDGE_PT_main(_Base, bpy.types.Panel):
             layout.operator("roombridge.disconnect", icon="UNLINKED")
         if c.last_error:
             layout.label(text=c.last_error[:90], icon="INFO")
+        if c.last_info:
+            layout.label(text=c.last_info[:90], icon="LIGHT")
 
 
 class ROOMBRIDGE_PT_people(_Base, bpy.types.Panel):
@@ -362,11 +418,13 @@ class ROOMBRIDGE_PT_design(_Base, bpy.types.Panel):
     def draw(self, _context):
         c = sync.ctrl
         layout = self.layout
-        row = layout.row(align=True)
-        row.operator("roombridge.add_object", text="Pillar", icon="MESH_CYLINDER").kind = "pillar"
-        row.operator("roombridge.add_object", text="Partition", icon="MESH_CUBE").kind = "partition"
-        row.operator("roombridge.add_object", text="Picture", icon="IMAGE_PLANE").kind = "panel"
+        for group, kinds in catalog.groups():
+            layout.label(text=group)
+            grid = layout.grid_flow(row_major=True, columns=3, even_columns=True, align=True)
+            for k in kinds:
+                grid.operator("roombridge.add_object", text=k["label"], icon=k["blenderIcon"]).kind = k["kind"]
         layout.label(text="Edit with Move (G), Rotate (R), Scale (S). Delete (X) syncs.")
+        layout.label(text="The phone narrates each edit to the novice as a CAD lesson.", icon="INFO")
         col = layout.column(align=True)
         for o in sorted(c.server_objects.values(), key=lambda o: o["name"]):
             r = c.reactions.get(o["id"], {})
@@ -375,11 +433,52 @@ class ROOMBRIDGE_PT_design(_Base, bpy.types.Panel):
             extra = f"  {likes} like" if likes else ""
             extra += f"  {discuss} discuss" if discuss else ""
             extra += f"  {n_comments} comment(s)" if n_comments else ""
-            col.label(text=f"{o['name']}  r{o['revision']}{'  STALE' if o.get('stale') else ''}{extra}")
+            proposed = "  PROPOSAL" if o.get("proposal") else ""
+            col.label(text=f"{o['name']}  r{o['revision']}{'  STALE' if o.get('stale') else ''}{proposed}{extra}")
         box = layout.box()
         box.label(text="Not synced (local only):", icon="INFO")
         box.label(text="mesh/edit-mode edits, modifiers, parenting,")
         box.label(text="materials, animation, negative scale.")
+
+
+OUTCOME_LABEL = {"accepted": ("Accepted", "CHECKMARK"), "adjusted": ("Accepted with your changes", "MODIFIER"),
+                 "rejected": ("Rejected", "X")}
+
+
+class ROOMBRIDGE_PT_proposals(_Base, bpy.types.Panel):
+    bl_label = "Novice Proposals"
+    bl_parent_id = "ROOMBRIDGE_PT_main"
+
+    @classmethod
+    def poll(cls, _context):
+        return sync.ctrl.session is not None
+
+    def draw(self, context):
+        st = _settings(context)
+        c = sync.ctrl
+        layout = self.layout
+        pending = sync.pending_proposals()
+        if not pending:
+            layout.label(text="Nothing to review. The novice can place objects from the phone.")
+        else:
+            layout.label(text="Select one, adjust it (G/R/S) if needed, then decide:")
+            layout.prop(st, "proposal_note", text="Note", icon="TEXT")
+        for o in pending:
+            box = layout.box()
+            box.label(text=f"{o['proposal']['byName']}: {o['name']} ({catalog.get(o['kind'])['label']})", icon="USER")
+            row = box.row(align=True)
+            op = row.operator("roombridge.select_object", text="Select", icon="RESTRICT_SELECT_OFF")
+            op.object_id = o["id"]
+            op = row.operator("roombridge.proposal", text="Accept", icon="CHECKMARK")
+            op.action, op.object_id = "proposal.accept", o["id"]
+            op = row.operator("roombridge.proposal", text="Reject", icon="X")
+            op.action, op.object_id = "proposal.reject", o["id"]
+        if c.proposal_log:
+            col = layout.column(align=True)
+            col.label(text="Recent decisions:")
+            for r in c.proposal_log[:4]:
+                label, icon = OUTCOME_LABEL.get(r["outcome"], (r["outcome"], "DOT"))
+                col.label(text=f"{label}: {r['objectName']}" + (f" — “{r['note'][:40]}”" if r.get("note") else ""), icon=icon)
 
 
 class ROOMBRIDGE_PT_guidance(_Base, bpy.types.Panel):
@@ -471,10 +570,13 @@ CLASSES = (
     ROOMBRIDGE_OT_guidance,
     ROOMBRIDGE_OT_reimport_scan,
     ROOMBRIDGE_OT_replace_stale,
+    ROOMBRIDGE_OT_proposal,
+    ROOMBRIDGE_OT_select_object,
     ROOMBRIDGE_PT_main,
     ROOMBRIDGE_PT_people,
     ROOMBRIDGE_PT_room,
     ROOMBRIDGE_PT_design,
+    ROOMBRIDGE_PT_proposals,
     ROOMBRIDGE_PT_guidance,
     ROOMBRIDGE_PT_discussion,
     ROOMBRIDGE_PT_debug,

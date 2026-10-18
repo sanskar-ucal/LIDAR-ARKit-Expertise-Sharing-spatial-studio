@@ -80,6 +80,56 @@ final class ARSessionController: NSObject, ARSessionDelegate {
         arView.session.currentFrame?.anchors.compactMap { $0 as? ARMeshAnchor } ?? []
     }
 
+    struct Placement {
+        var position: Vec3
+        var rotation: Quat
+    }
+
+    /// Where a new object would go if placed at the screen centre: on the floor, or against a
+    /// wall facing out, always turned so its front faces the phone. Nil if no surface is found.
+    func placement(for spec: Catalog.Kind, dimensions: Vec3) -> Placement? {
+        let cam = SIMD3<Float>(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+        if sampleMode {
+            // The sample room has its floor at y = 0 and no tracking; place 1.8 m ahead of the camera.
+            let fwd = -SIMD3<Float>(cameraTransform.columns.2.x, 0, cameraTransform.columns.2.z)
+            let dir = simd_length(fwd) > 1e-3 ? simd_normalize(fwd) : SIMD3<Float>(0, 0, -1)
+            var p = cam + dir * 1.8
+            p.y = spec.origin == .center ? Float(spec.height) : 0
+            return Placement(position: Vec3(p), rotation: Self.facing(from: p, toward: cam))
+        }
+        let center = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
+        let alignment: ARRaycastQuery.TargetAlignment = spec.mount == .wall ? .vertical : .horizontal
+        guard let hit = arView.raycast(from: center, allowing: .estimatedPlane, alignment: alignment).first else { return nil }
+        let t = hit.worldTransform
+        let point = SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z)
+        if spec.mount == .floor {
+            return Placement(position: Vec3(point), rotation: Self.facing(from: point, toward: cam))
+        }
+        // Wall: the hit's Y axis is the surface normal; make it point back toward the phone.
+        var normal = SIMD3<Float>(t.columns.1.x, 0, t.columns.1.z)
+        if simd_length(normal) < 0.5 { normal = SIMD3<Float>(cam.x - point.x, 0, cam.z - point.z) }
+        normal = simd_normalize(normal)
+        if simd_dot(normal, cam - point) < 0 { normal = -normal }
+        var p = point + normal * Float(dimensions.z / 2)
+        if spec.origin == .bottom { p.y = floorHeight(below: point) ?? (cam.y - 1.4) }  // doorways stand on the floor
+        let yaw = atan2(normal.x, normal.z)
+        return Placement(position: Vec3(p), rotation: Quat(0, Double(sin(yaw / 2)), 0, Double(cos(yaw / 2))))
+    }
+
+    /// Height of the floor under a point, from ARKit's plane estimate.
+    private func floorHeight(below point: SIMD3<Float>) -> Float? {
+        let query = ARRaycastQuery(origin: point + SIMD3<Float>(0, 0.05, 0), direction: SIMD3<Float>(0, -1, 0),
+                                   allowing: .estimatedPlane, alignment: .horizontal)
+        guard let hit = arView.session.raycast(query).first else { return nil }
+        return hit.worldTransform.columns.3.y
+    }
+
+    /// Yaw-only rotation whose local +Z (the object's front) points from `p` toward `target`.
+    private static func facing(from p: SIMD3<Float>, toward target: SIMD3<Float>) -> Quat {
+        let yaw = atan2(target.x - p.x, target.z - p.z)
+        return Quat(0, Double(sin(yaw / 2)), 0, Double(cos(yaw / 2)))
+    }
+
     // MARK: ARSessionDelegate (ARKit calls these on the main queue)
 
     nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {

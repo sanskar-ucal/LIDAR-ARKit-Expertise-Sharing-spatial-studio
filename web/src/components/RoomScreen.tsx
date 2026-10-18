@@ -5,6 +5,7 @@ import { ROLE_LABEL } from "../protocol";
 import type { StoredInvite } from "../session";
 import { Comments } from "./Comments";
 import { DevPanel } from "./DevPanel";
+import { LearningFeed } from "./LearningFeed";
 import { ObjectList } from "./ObjectList";
 import { Participants } from "./Participants";
 import { PreviewPanel } from "./PreviewPanel";
@@ -103,6 +104,7 @@ export function RoomScreen({ invite, displayName, onLeave }: Props) {
             </div>
           )}
           <RoomPlan objects={s.objects} guidance={s.guidance} selected={selected} onSelect={select} />
+          <LearningFeed feed={s.feed} />
         </section>
         <aside className="side">
           <Participants participants={s.participants} me={s.clientId} objects={s.objects} />

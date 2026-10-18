@@ -12,6 +12,8 @@ struct RoomView: View {
     @Environment(AppModel.self) private var model
     @State private var showShare = false
     @State private var showDiscussion = false
+    @State private var showLibrary = false
+    @State private var showLearn = false
     @State private var confirmEnd = false
     @State private var confirmReset = false
 
@@ -20,21 +22,36 @@ struct RoomView: View {
             if let ar = model.ar {
                 ARViewContainer(arView: ar.arView).ignoresSafeArea()
             }
+            if model.placingKind != nil {
+                Crosshair(ready: model.placementReady)
+            }
             VStack(spacing: 8) {
                 StatusBar()
+                if let item = model.toast {
+                    LearnToast(item: item).onTapGesture { showLearn = true }
+                }
                 Spacer()
-                if model.guidance != nil {
+                if model.placingKind != nil {
+                    PlacementPanel()
+                } else if model.guidance != nil {
                     GuidancePanel()
+                } else if model.editingProposal != nil {
+                    ProposalPanel()
                 } else {
+                    ProposalsStrip()
                     ScanPanel()
                 }
-                ControlBar(showShare: $showShare, showDiscussion: $showDiscussion, confirmEnd: $confirmEnd, confirmReset: $confirmReset)
+                ControlBar(showShare: $showShare, showDiscussion: $showDiscussion, showLibrary: $showLibrary, showLearn: $showLearn,
+                           confirmEnd: $confirmEnd, confirmReset: $confirmReset)
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
+            .animation(.easeInOut(duration: 0.25), value: model.toast?.id)
         }
         .sheet(isPresented: $showShare) { ShareView() }
         .sheet(isPresented: $showDiscussion) { DiscussionView() }
+        .sheet(isPresented: $showLibrary) { LibrarySheet() }
+        .sheet(isPresented: $showLearn) { LearnSheet() }
         .sheet(isPresented: Binding(get: { model.showDeveloper }, set: { model.showDeveloper = $0 })) { DeveloperPanel() }
         .confirmationDialog("Leave the room?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button("End room for everyone", role: .destructive) { model.leave(end: true) }
@@ -212,6 +229,8 @@ struct ControlBar: View {
     @Environment(AppModel.self) private var model
     @Binding var showShare: Bool
     @Binding var showDiscussion: Bool
+    @Binding var showLibrary: Bool
+    @Binding var showLearn: Bool
     @Binding var confirmEnd: Bool
     @Binding var confirmReset: Bool
 
@@ -223,18 +242,23 @@ struct ControlBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button { showShare = true } label: { Label("Invite", systemImage: "qrcode") }
+        HStack(spacing: 8) {
             Button { model.captureScan() } label: { Label("Send room", systemImage: "square.and.arrow.up.on.square") }
                 .disabled(scanBusy || !model.isConnected || model.awaitingOriginReset || (!model.sampleMode && !AppModel.deviceHasLiDAR))
             Button { model.toggleBroadcast() } label: {
                 Label(model.broadcasting ? "Stop preview" : "Share preview", systemImage: model.broadcasting ? "video.slash" : "video")
             }
             .tint(model.broadcasting ? Theme.bad : Theme.accent)
+            Button { model.cancelPlacement(); showLibrary = true } label: { Label("Add object", systemImage: "plus.square.on.square") }
+                .disabled(!model.isConnected || model.awaitingOriginReset)
+            Button { showLearn = true } label: {
+                Label("Learn", systemImage: "graduationcap")
+            }
             Button { showDiscussion = true } label: {
                 Label("Chat", systemImage: "bubble.left.and.bubble.right")
             }
             Menu {
+                Button { showShare = true } label: { Label("Invite people", systemImage: "qrcode") }
                 Button { confirmReset = true } label: { Label("Reset AR origin", systemImage: "arrow.triangle.2.circlepath") }
                     .disabled(model.sampleMode)
                 Button { model.showDeveloper = true } label: { Label("Developer panel", systemImage: "wrench.and.screwdriver") }

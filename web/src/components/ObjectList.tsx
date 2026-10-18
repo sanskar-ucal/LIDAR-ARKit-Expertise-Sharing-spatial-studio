@@ -1,3 +1,4 @@
+import { kindInfo, kindLabel } from "../catalog";
 import type { Comment, Reactions, SceneObject } from "../protocol";
 
 interface Props {
@@ -11,18 +12,16 @@ interface Props {
   onReact(objectId: string, kind: "like" | "discuss"): void;
 }
 
-const KIND_LABEL = { pillar: "Pillar", partition: "Partition", panel: "Picture panel" } as const;
-
 export function describeSize(o: SceneObject): string {
   const [w, h, d] = o.dimensions.map((v) => v.toFixed(2));
-  return o.kind === "pillar" ? `Ø ${w} m, ${h} m tall` : `${w} × ${h} × ${d} m`;
+  return kindInfo(o.kind)?.round ? `Ø ${w} m, ${h} m tall` : `${w} × ${h} × ${d} m`;
 }
 
 export function ObjectList({ objects, reactions, comments, me, selected, guidedId, onSelect, onReact }: Props) {
   return (
     <section className="card">
       <h2>Design objects</h2>
-      {objects.length === 0 && <p className="muted">No objects yet. The expert adds them from Blender.</p>}
+      {objects.length === 0 && <p className="muted">No objects yet. The expert adds them from Blender; the novice can propose them from the phone.</p>}
       <ul className="objects">
         {objects.map((o) => {
           const r = reactions[o.id] ?? { like: [], discuss: [] };
@@ -36,10 +35,11 @@ export function ObjectList({ objects, reactions, comments, me, selected, guidedI
                   <strong>{o.name}</strong>
                   <span className="muted small">
                     {" "}
-                    {o.name.toLowerCase().startsWith(KIND_LABEL[o.kind].toLowerCase()) ? "" : `${KIND_LABEL[o.kind]} · `}
+                    {o.name.toLowerCase().startsWith(kindLabel(o.kind).toLowerCase()) ? "" : `${kindLabel(o.kind)} · `}
                     {describeSize(o)}
                   </span>
                   {o.stale && <span className="tag warn">needs re-placing</span>}
+                  {o.proposal && <span className="tag proposal">proposed by {o.proposal.byName} · awaiting expert</span>}
                   {guidedId === o.id && <span className="tag accent">being moved</span>}
                 </span>
               </button>

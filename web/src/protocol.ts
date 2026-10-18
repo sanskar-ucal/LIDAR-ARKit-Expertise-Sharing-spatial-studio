@@ -6,7 +6,44 @@ export type Vec3 = [number, number, number];
 export type Quat = [number, number, number, number];
 export type Role = "host" | "expert" | "viewer";
 export type Axis = "x" | "y" | "z";
-export type ObjectKind = "pillar" | "partition" | "panel";
+export type ObjectKind =
+  | "pillar"
+  | "partition"
+  | "door"
+  | "window"
+  | "table"
+  | "chair"
+  | "couch"
+  | "cabinet"
+  | "lamp"
+  | "tv"
+  | "panel"
+  | "block";
+
+export interface ObjectPose {
+  position: Vec3;
+  rotation: Quat;
+  dimensions: Vec3;
+}
+
+/** Present while a novice's object waits for the expert's decision. */
+export interface ProposalInfo {
+  byClientId: string;
+  byName: string;
+  proposedAt: number;
+  novice: ObjectPose;
+}
+
+export interface ProposalResolved {
+  objectId: string;
+  objectName: string;
+  kind: ObjectKind;
+  outcome: "accepted" | "adjusted" | "rejected";
+  byName: string;
+  note: string | null;
+  before: ObjectPose;
+  after: ObjectPose | null;
+}
 
 export interface SceneObject {
   id: string;
@@ -23,6 +60,7 @@ export interface SceneObject {
   owner: string;
   createdBy: string;
   updatedAt: number;
+  proposal?: ProposalInfo | null;
 }
 
 export interface Pose {

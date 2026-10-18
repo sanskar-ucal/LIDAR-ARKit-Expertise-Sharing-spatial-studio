@@ -1,3 +1,4 @@
+import { kindInfo } from "../catalog";
 import { AXIS_INFO, type Guidance, type Quat, type SceneObject, type Vec3 } from "../protocol";
 
 interface Props {
@@ -21,7 +22,7 @@ function Footprint({ o, pos, rot, className, onClick }: { o: SceneObject; pos: V
   const transform = `translate(${pos[0]} ${pos[2]}) rotate(${-deg(yaw(rot))})`;
   return (
     <g transform={transform} className={className} onClick={onClick}>
-      {o.kind === "pillar" ? (
+      {kindInfo(o.kind)?.round ? (
         <circle r={w / 2} fill={o.color} />
       ) : (
         <rect x={-w / 2} y={-Math.max(d, 0.03) / 2} width={w} height={Math.max(d, 0.03)} fill={o.color} />
@@ -93,7 +94,7 @@ export function RoomPlan({ objects, guidance, selected, onSelect }: Props) {
               o={o}
               pos={o.position}
               rot={o.rotation}
-              className={`plan-obj ${selected === o.id ? "selected" : ""} ${guidance?.objectId === o.id && guidance.state === "active" ? "dim" : ""}`}
+              className={`plan-obj ${selected === o.id ? "selected" : ""} ${guidance?.objectId === o.id && guidance.state === "active" ? "dim" : ""} ${o.proposal ? "proposed" : ""}`}
               onClick={() => onSelect(selected === o.id ? null : o.id)}
             />
             <text x={o.position[0]} y={o.position[2] - Math.max(0.2, o.dimensions[2] / 2 + 0.12)} fontSize={span / 38} textAnchor="middle" className="plan-label">
@@ -111,7 +112,7 @@ export function RoomPlan({ objects, guidance, selected, onSelect }: Props) {
         )}
       </svg>
       <p className="fine">
-        Grid squares are 1 m. Dashed outline = target; orange dot = where the phone user has moved it.
+        Grid squares are 1 m. Dashed outline = target; orange dot = where the phone user has moved it; faded = the novice’s proposal.
         {guidance?.axis === "y" && " This move is up/down, so it does not show on the plan."}
       </p>
     </section>

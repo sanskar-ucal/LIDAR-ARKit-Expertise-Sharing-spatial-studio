@@ -13,7 +13,7 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 
 ## B. Invites and roles
 
-- [ ] B1. The Invite sheet shows a QR code; scanning it on the second device opens the viewer join page, and the token disappears from the address bar after loading.
+- [ ] B1. The Invite sheet (**More › Invite people**) shows a QR code; scanning it on the second device opens the viewer join page, and the token disappears from the address bar after loading.
 - [ ] B2. The family member joins and appears on the phone (Chat › People) as Family.
 - [ ] B3. Pasting the **viewer** link into Blender is refused; pasting the **expert** invite connects as Expert.
 - [ ] B4. Saving the `.blend` file and reopening it: no credential is stored (the token field is empty).
@@ -33,6 +33,17 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 - [ ] D4. Rotating (R) a partition 90° about Blender Z rotates it the same way in AR.
 - [ ] D5. Deleting (X) an object in Blender removes it on the phone and in the browser; its comments stay, marked "(deleted)".
 - [ ] D6. The family viewer's plan view matches the layout seen in AR.
+- [ ] D7. Adding each library piece in Blender (Doorway, Window, Table, Chair, Couch, Cabinet, Lamp, TV, Custom block): each looks the same in AR as in Blender (legs on the floor, chair back and couch back away from the front, TV screen and window on the front face). Wall pieces start at their usual height.
+
+## D+. Learning and proposals
+
+- [ ] L1. When the expert moves a table along X in Blender, the phone shows one toast (not one per update) about a second after the drag ends, reading like "Sam moved Table 1 … along the red X axis" with **G X** keycaps and the typed value. The first time, a "New skill" tip appears.
+- [ ] L2. Rotating (R Z 90) and scaling (S Z) in Blender produce "turned … 90°" with **R Z 90** and "resized …: height …" with **S Z**. The Learn sheet ticks the matching CAD skills.
+- [ ] L3. **＋ Add object** opens the library; picking Table shows a translucent preview at the crosshair on the floor; picking Window or TV needs the dot on a wall and faces out from it. **Place & propose** creates it; Blender shows it under **Novice Proposals**, outlined, with a notice.
+- [ ] L4. While waiting, Move to dot, ±15°/90° and the size steppers update the proposal on the phone immediately and in Blender within about a second, and the phone narrates each change ("You turned … — R Z 15"). Rapid taps do not lose the last change.
+- [ ] L5. In Blender, move the proposal, type a note, and **Accept**: the phone buzzes (success), says "approved your … after adjusting it", explains the move in Blender keys and shows the note; the object loses its "YOUR PROPOSAL" label. **Reject** with a note: the phone gives a warning buzz, removes the object and shows the note.
+- [ ] L6. A Custom block can be resized, recoloured and renamed on the phone before the expert accepts it.
+- [ ] L7. The family viewer's "CAD lesson" feed shows the same explanations, and its object list tags pending proposals.
 
 ## E. Preview
 

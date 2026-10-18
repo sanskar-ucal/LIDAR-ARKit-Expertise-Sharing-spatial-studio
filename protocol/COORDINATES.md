@@ -73,6 +73,13 @@ All origins and local axes are in canonical terms.
 | `pillar` | vertical cylinder, axis = local +Y | `[diameter, height, diameter]`; X and Z must be equal (1 mm tolerance) | center of the **base** disc |
 | `partition` | cuboid | `[width, height, depth]` | center of the **bottom** face |
 | `panel` (picture panel) | thin cuboid; picture on the local **+Z** face | `[width, height, thickness]` | **geometric center** |
+| `door`, `table`, `chair`, `couch`, `cabinet`, `lamp`, `block` | parts from [catalog.json](catalog.json) | `[width, height, depth]` (lamp: round like a pillar) | center of the **bottom** |
+| `window`, `tv` | parts from [catalog.json](catalog.json); front is local **+Z** | `[width, height, depth]` | **geometric center** |
+
+Catalog parts are given in the unit box of their kind (x, z in [-0.5, 0.5]; y in [0, 1] for
+a bottom origin or [-0.5, 0.5] for a centre origin) and scaled by the object's dimensions, so
+every client builds the same shape. The front of every object (chair seat, couch, TV screen)
+faces local +Z.
 
 Allowed dimension range per axis: 0.01 m to 20 m. Allowed position range:
 |coordinate| <= 100 m.

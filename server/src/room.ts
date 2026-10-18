@@ -42,12 +42,28 @@ interface ParticipantRecord extends Participant {
   previewTicket: string | null;
 }
 
+export interface ObjectPose {
+  position: Vec3;
+  rotation: Quat;
+  dimensions: Vec3;
+}
+
+/** Present while a novice's object waits for the expert's decision. */
+export interface ProposalInfo {
+  byClientId: string;
+  byName: string;
+  proposedAt: number;
+  /** The novice's latest version, so the server can tell the novice what the expert changed. */
+  novice: ObjectPose;
+}
+
 export interface SceneObject extends ObjectInput {
   revision: number;
   originEpoch: number;
-  owner: "expert";
+  owner: "expert" | "host";
   createdBy: string;
   updatedAt: number;
+  proposal: ProposalInfo | null;
 }
 
 export interface Comment {
@@ -93,6 +109,16 @@ export interface HostPreview {
   state: "live" | "paused";
   targetFps: number;
   width: number;
+}
+
+const pose = (o: ObjectPose): ObjectPose => ({ position: [...o.position], rotation: [...o.rotation], dimensions: [...o.dimensions] });
+
+/** True if the expert changed the novice's proposal noticeably (1 cm, 1 degree, 5 mm). */
+function poseChanged(a: ObjectPose, b: ObjectPose): boolean {
+  if (distance(a.position, b.position) > 0.01) return true;
+  if (a.dimensions.some((v, i) => Math.abs(v - b.dimensions[i]!) > 0.005)) return true;
+  const dot = Math.abs(a.rotation.reduce((s, v, i) => s + v * b.rotation[i]!, 0));
+  return 2 * Math.acos(Math.min(1, dot)) > (1 * Math.PI) / 180;
 }
 
 const DEFAULT_TOLERANCE = 0.05;
@@ -364,6 +390,12 @@ export class Room {
         return this.resetOrigin(rec);
       case "object.create":
         return this.createObject(rec, p);
+      case "object.propose":
+        return this.proposeObject(rec, p);
+      case "proposal.accept":
+        return this.acceptProposal(rec, p);
+      case "proposal.reject":
+        return this.rejectProposal(rec, p);
       case "object.update":
         return this.updateObject(rec, p);
       case "object.delete":
@@ -405,7 +437,26 @@ export class Room {
   }
 
   private createObject(rec: ParticipantRecord, p: Payload<"object.create">): void {
+    this.insertObject(rec, p.object, null);
+  }
+
+  /** The novice suggests an object; it stays a proposal until the expert accepts or rejects it. */
+  private proposeObject(rec: ParticipantRecord, p: Payload<"object.propose">): void {
+    let pending = 0;
+    for (const o of this.objects.values()) if (o.proposal) pending++;
+    if (pending >= LIMITS.maxPendingProposals) {
+      throw new ProtocolError("too_large", `At most ${LIMITS.maxPendingProposals} proposals can wait for the expert at once`);
+    }
     const input = p.object;
+    this.insertObject(rec, input, {
+      byClientId: rec.clientId,
+      byName: rec.displayName,
+      proposedAt: this.now(),
+      novice: pose({ ...input, rotation: validateRotation(input.rotation) }),
+    });
+  }
+
+  private insertObject(rec: ParticipantRecord, input: ObjectInput, proposal: ProposalInfo | null): void {
     const id = input.id.toLowerCase();
     const existing = this.objects.get(id);
     if (existing) throw new ProtocolError("duplicate_object", "An object with this id already exists", this.serializeObject(existing));
@@ -418,9 +469,10 @@ export class Room {
       rotation: validateRotation(input.rotation),
       revision: 1,
       originEpoch: this.originEpoch,
-      owner: "expert",
+      owner: proposal ? "host" : "expert",
       createdBy: rec.clientId,
       updatedAt: this.now(),
+      proposal,
     };
     this.objects.set(id, obj);
     this.sceneRevision += 1;
@@ -431,6 +483,9 @@ export class Room {
     const id = p.id.toLowerCase();
     const obj = this.objects.get(id);
     if (!obj) throw new ProtocolError("not_found", "Object does not exist (it may have been deleted)");
+    if (rec.role === "host" && !obj.proposal) {
+      throw new ProtocolError("forbidden", "The expert owns this object; propose a new one instead");
+    }
     if (p.baseRevision !== obj.revision) {
       throw new ProtocolError("stale_revision", `Object is at revision ${obj.revision}`, this.serializeObject(obj));
     }
@@ -441,14 +496,65 @@ export class Room {
     next.revision = obj.revision + 1;
     next.originEpoch = this.originEpoch;
     next.updatedAt = this.now();
+    if (next.proposal && rec.role === "host") next.proposal = { ...next.proposal, novice: pose(next) };
     this.objects.set(id, next);
     this.sceneRevision += 1;
     this.broadcast(this.envelope("object.updated", rec.clientId, { object: this.serializeObject(next) }));
   }
 
-  private deleteObject(rec: ParticipantRecord, p: Payload<"object.delete">): void {
+  private acceptProposal(rec: ParticipantRecord, p: Payload<"proposal.accept">): void {
+    const obj = this.requireProposal(p.id);
+    const proposal = obj.proposal!;
+    const next: SceneObject = { ...obj, owner: "expert", proposal: null, revision: obj.revision + 1, updatedAt: this.now() };
+    this.objects.set(obj.id, next);
+    this.sceneRevision += 1;
+    this.broadcast(this.envelope("object.updated", rec.clientId, { object: this.serializeObject(next) }));
+    if (p.note) this.pushComment(rec, next, p.note);
+    this.broadcastResolution(rec, obj, poseChanged(proposal.novice, next) ? "adjusted" : "accepted", p.note ?? null, pose(next));
+  }
+
+  private rejectProposal(rec: ParticipantRecord, p: Payload<"proposal.reject">): void {
+    const obj = this.requireProposal(p.id);
+    if (p.note) this.pushComment(rec, obj, p.note);
+    this.deleteObject(rec, { id: obj.id }, p.note ?? null);
+  }
+
+  private requireProposal(id: string): SceneObject {
+    const obj = this.objects.get(id.toLowerCase());
+    if (!obj) throw new ProtocolError("not_found", "Object does not exist (it may have been withdrawn)");
+    if (!obj.proposal) throw new ProtocolError("invalid_state", "This object is not a pending proposal");
+    return obj;
+  }
+
+  private broadcastResolution(
+    rec: ParticipantRecord,
+    obj: SceneObject,
+    outcome: "accepted" | "adjusted" | "rejected",
+    note: string | null,
+    after: ObjectPose | null,
+  ): void {
+    this.broadcast(
+      this.envelope("proposal.resolved", rec.clientId, {
+        objectId: obj.id,
+        objectName: obj.name,
+        kind: obj.kind,
+        outcome,
+        byName: rec.displayName,
+        note,
+        before: pose(obj.proposal!.novice),
+        after,
+      }),
+    );
+  }
+
+  private deleteObject(rec: ParticipantRecord, p: Payload<"object.delete">, rejectionNote: string | null = null): void {
     const id = p.id.toLowerCase();
-    if (!this.objects.delete(id)) throw new ProtocolError("not_found", "Object does not exist");
+    const obj = this.objects.get(id);
+    if (!obj) throw new ProtocolError("not_found", "Object does not exist");
+    if (rec.role === "host" && !obj.proposal) {
+      throw new ProtocolError("forbidden", "The expert owns this object; ask them to remove it");
+    }
+    this.objects.delete(id);
     for (const c of this.comments) if (c.objectId === id) c.objectDeleted = true;
     this.reactions.delete(id);
     let selectionChanged = false;
@@ -465,6 +571,8 @@ export class Room {
       this.broadcastGuidance(rec.clientId);
     }
     if (selectionChanged) this.broadcastPresence();
+    // The expert deleting a proposal (or rejecting it) is a rejection the novice should hear about.
+    if (obj.proposal && rec.role === "expert") this.broadcastResolution(rec, obj, "rejected", rejectionNote, null);
   }
 
   private select(rec: ParticipantRecord, p: Payload<"selection">): void {
@@ -481,14 +589,18 @@ export class Room {
     const objectId = p.objectId?.toLowerCase() ?? null;
     const obj = objectId ? this.objects.get(objectId) : undefined;
     if (objectId && !obj) throw new ProtocolError("not_found", "That object no longer exists");
+    this.pushComment(rec, obj ?? null, p.text);
+  }
+
+  private pushComment(rec: ParticipantRecord, obj: SceneObject | null, text: string): void {
     const comment: Comment = {
       id: randomId("k_"),
-      objectId,
+      objectId: obj?.id ?? null,
       objectName: obj?.name ?? null,
       authorId: rec.clientId,
       authorName: rec.displayName,
       authorRole: rec.role,
-      text: p.text,
+      text,
       createdAt: this.now(),
       objectDeleted: false,
     };
@@ -518,6 +630,7 @@ export class Room {
   private requireLiveObject(id: string): SceneObject {
     const obj = this.objects.get(id.toLowerCase());
     if (!obj) throw new ProtocolError("not_found", "Object does not exist");
+    if (obj.proposal) throw new ProtocolError("invalid_state", "Accept the novice's proposal before guiding it");
     if (obj.originEpoch !== this.originEpoch) {
       throw new ProtocolError("stale_epoch", "Object is from a previous scan origin; re-place it first");
     }

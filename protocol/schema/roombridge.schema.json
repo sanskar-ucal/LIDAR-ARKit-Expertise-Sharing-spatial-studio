@@ -15,7 +15,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "format": "uuid" },
-        "kind": { "enum": ["pillar", "partition", "panel"] },
+        "kind": { "enum": ["pillar", "partition", "door", "window", "table", "chair", "couch", "cabinet", "lamp", "tv", "panel", "block"] },
         "name": { "type": "string", "minLength": 1, "maxLength": 60 },
         "position": { "$ref": "#/$defs/vec3" },
         "rotation": { "$ref": "#/$defs/quat" },
@@ -31,9 +31,32 @@
         "revision": { "type": "integer", "minimum": 1 },
         "originEpoch": { "type": "integer", "minimum": 1 },
         "stale": { "type": "boolean" },
-        "owner": { "const": "expert" },
+        "owner": { "enum": ["expert", "host"] },
         "createdBy": { "type": "string" },
-        "updatedAt": { "type": "number" }
+        "updatedAt": { "type": "number" },
+        "proposal": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["byClientId", "byName", "proposedAt", "novice"],
+              "properties": {
+                "byClientId": { "type": "string" },
+                "byName": { "type": "string" },
+                "proposedAt": { "type": "number" },
+                "novice": {
+                  "type": "object",
+                  "required": ["position", "rotation", "dimensions"],
+                  "properties": {
+                    "position": { "$ref": "#/$defs/vec3" },
+                    "rotation": { "$ref": "#/$defs/quat" },
+                    "dimensions": { "$ref": "#/$defs/vec3" }
+                  }
+                }
+              }
+            }
+          ]
+        }
       }
     }
   },
