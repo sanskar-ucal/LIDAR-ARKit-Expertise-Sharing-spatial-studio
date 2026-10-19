@@ -67,7 +67,7 @@ Cross-component compatibility is checked with shared fixtures in `protocol/fixtu
 
 ## Manual verification performed
 
-- **Web viewer with synthetic frames (2026-10-11, desktop browser on the build Mac):** server started with `npm start`, `npm run synthetic-frames -w server -- --objects` streamed the synthetic frames, and the viewer link was opened in a browser. The token disappeared from the address bar. After joining: frames updated with the "SIMULATED — not a real camera" badge; participants showed host, expert and family roles; the three sample objects were listed; selecting the pillar showed "looking at Pillar"; a like and an object-linked comment appeared. A scripted expert then started a guidance step, and the caption read "Move along the red (left/right) axis toward the target, 60 cm" with the target on the plan view. This used synthetic data only and says nothing about the phone.
+- **Web viewer with synthetic frames (2026-10-11, desktop browser on the build Mac):** server started with `npm start`, `npm run synthetic-frames -w server -- --objects` streamed the synthetic frames, and the viewer link was opened in a browser. The token disappeared from the address bar. After joining: frames updated with the "SIMULATED: not a real camera" badge; participants showed host, expert and family roles; the three sample objects were listed; selecting the pillar showed "looking at Pillar"; a like and an object-linked comment appeared. A scripted expert then started a guidance step, and the caption read "Move along the red (left/right) axis toward the target, 60 cm" with the target on the plan view. This used synthetic data only and says nothing about the phone.
 
 ## Automated test results
 

@@ -27,7 +27,7 @@ struct ShareView: View {
                             UIPasteboard.general.string = link
                             copied = true
                         } label: {
-                            Label(copied ? "Copied — paste into Blender" : "Copy expert invite",
+                            Label(copied ? "Copied! Paste it into Blender" : "Copy expert invite",
                                   systemImage: copied ? "checkmark" : "doc.on.doc")
                         }
                         ShareLink(item: link) { Label("Share expert invite", systemImage: "square.and.arrow.up") }

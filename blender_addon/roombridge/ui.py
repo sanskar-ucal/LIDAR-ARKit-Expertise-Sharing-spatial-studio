@@ -426,7 +426,7 @@ class ROOMBRIDGE_PT_people(_Base, bpy.types.Panel):
         col = self.layout.column(align=True)
         for p in c.participants:
             state = "" if p["connected"] else "  (disconnected)"
-            col.label(text=f"{p['displayName']} — {ROLE_LABEL.get(p['role'], p['role'])}{state}",
+            col.label(text=f"{p['displayName']}: {ROLE_LABEL.get(p['role'], p['role'])}{state}",
                       icon="USER" if p["connected"] else "GHOST_DISABLED")
         prev = c.preview
         if prev:
@@ -528,7 +528,7 @@ class ROOMBRIDGE_PT_proposals(_Base, bpy.types.Panel):
             col.label(text="Recent decisions:")
             for r in c.proposal_log[:4]:
                 label, icon = OUTCOME_LABEL.get(r["outcome"], (r["outcome"], "DOT"))
-                col.label(text=f"{label}: {r['objectName']}" + (f" — “{r['note'][:40]}”" if r.get("note") else ""), icon=icon)
+                col.label(text=f"{label}: {r['objectName']}" + (f": “{r['note'][:40]}”" if r.get("note") else ""), icon=icon)
 
 
 LESSON_STATE = {"open": ("Waiting for the novice", "TIME"), "done": ("Novice says done", "CHECKMARK")}

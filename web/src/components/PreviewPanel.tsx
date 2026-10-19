@@ -54,9 +54,9 @@ export function PreviewPanel({ client }: { client: RoomClient }) {
         )}
         {!overlay && f && (
           <div className="preview-badges">
-            {f.synthetic && <span className="badge bad">SIMULATED — not a real camera</span>}
+            {f.synthetic && <span className="badge bad">SIMULATED: not a real camera</span>}
             {f.trackingLimited && <span className="badge warn">Phone tracking limited</span>}
-            {age > STALE_MS && <span className="badge warn">Frozen {Math.round(age / 1000)} s — connection slow</span>}
+            {age > STALE_MS && <span className="badge warn">Frozen {Math.round(age / 1000)} s: connection slow</span>}
           </div>
         )}
       </div>

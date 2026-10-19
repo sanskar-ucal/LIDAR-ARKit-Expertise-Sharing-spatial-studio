@@ -83,7 +83,7 @@ struct RoomAPI {
         return try JSONDecoder().decode(CommitResp.self, from: cd).scan
     }
 
-    /// Uploads a push-to-talk clip; attach the returned id to a comment.add.
+    /// Attach the returned clip id to a comment.add.
     func uploadVoice(roomId: String, token: String, audio: Data, mime: String) async throws -> String {
         var req = URLRequest(url: base.appendingPathComponent("api/rooms/\(roomId)/voice"))
         req.httpMethod = "POST"

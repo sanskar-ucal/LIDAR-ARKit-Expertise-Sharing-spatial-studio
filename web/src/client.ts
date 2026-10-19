@@ -78,7 +78,7 @@ export class RoomClient {
     return res.blob();
   }
 
-  /** Uploads a push-to-talk clip (expert only) and returns the id to attach to comment.add. */
+  /** Expert only. Returns the clip id to attach to comment.add. */
   async uploadVoice(audio: Blob): Promise<string> {
     const roomId = this.state.room?.id;
     if (!roomId) throw new Error("Not in a room");

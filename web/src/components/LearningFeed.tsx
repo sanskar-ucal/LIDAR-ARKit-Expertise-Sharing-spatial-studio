@@ -36,7 +36,6 @@ function StepLine({ step, lead }: { step: Step; lead?: string }) {
   );
 }
 
-/** Every change in the room, explained in Blender terms (a CAD lesson for the novice and observers). */
 export function LearningFeed({ feed }: { feed: FeedItem[] }) {
   return (
     <section className="card">

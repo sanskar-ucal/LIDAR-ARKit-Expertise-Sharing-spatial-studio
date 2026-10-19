@@ -162,13 +162,11 @@ enum Haptics {
         tap.impactOccurred()
     }
 
-    /// The expert accepted the novice's proposal.
     static func approved() {
         success.notificationOccurred(.success)
         success.prepare()
     }
 
-    /// The expert rejected the novice's proposal.
     static func rejected() {
         success.notificationOccurred(.warning)
         success.prepare()

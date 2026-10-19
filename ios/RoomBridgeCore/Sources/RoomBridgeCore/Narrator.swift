@@ -163,7 +163,6 @@ public struct EditNarrationBuffer: Sendable {
         }
     }
 
-    /// Forget an object (deleted, or its gesture should not be narrated).
     public mutating func drop(_ objectId: String) { pending[objectId] = nil }
 
     /// Gestures that have settled (or all of them with `force`), with their narration.

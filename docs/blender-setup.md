@@ -32,7 +32,7 @@ The credential is stored on the window manager, so it is not saved into your `.b
 ## What syncs
 
 - Objects in the **RoomBridge Design** collection that the add-on created, from the **Design Objects** library: Structure (Pillar, Partition, Doorway, Window), Furniture (Table, Chair, Couch, Cabinet), Lighting & decor (Lamp, TV, Picture) and Custom (Custom block). Each is built from simple boxes, cylinders and spheres defined in [protocol/catalog.json](../protocol/catalog.json), so the phone shows exactly the same shape. Hover a button to see its CAD lesson. Wall items (window, TV, picture) start at their usual height; everything else stands on the detected floor.
-- Move (G), rotate (R) and scale (S) in Object Mode, and delete (X). Changes stream while you drag (about 7 updates per second) and settle 0.1 s after you stop. The phone narrates each finished edit to the novice in Blender terms ("moved Table 1 50 cm along the red X axis — G X 0.5").
+- Move (G), rotate (R) and scale (S) in Object Mode, and delete (X). Changes stream while you drag (about 7 updates per second) and settle 0.1 s after you stop. The phone narrates each finished edit to the novice in Blender terms ("moved Table 1 50 cm along the red X axis: G X 0.5").
 - Pillars and lamps stay round: X and Y scale are kept equal.
 - Not synced (local only): edit-mode mesh changes, modifiers, parenting, materials, animation, negative scale.
 

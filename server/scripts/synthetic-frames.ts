@@ -140,7 +140,6 @@ async function main() {
   }
 
   if (flag("propose")) {
-    // The scripted host proposes furniture, as a novice would from the phone's object library.
     const proposals = [
       { kind: "table", name: "Table 1", position: [0.8, 0, -1.2], dimensions: [1.2, 0.75, 0.8], color: "#a0764f" },
       { kind: "chair", name: "Chair 1", position: [0.8, 0, -0.5], rotation: [0, 1, 0, 0], dimensions: [0.45, 0.9, 0.5], color: "#7a8b99" },

@@ -27,9 +27,9 @@
 
 **Viewers see "Preview paused".** The phone user hasn't tapped **Share preview**, or the app is in the background (iOS stops the camera there).
 
-**"Frozen N s — connection slow".** No new frame for over 2 seconds. Usually Wi-Fi congestion; the phone lowers resolution and frame rate automatically. The control channel (objects, comments, guidance) keeps working.
+**"Frozen N s: connection slow".** No new frame for over 2 seconds. Usually Wi-Fi congestion; the phone lowers resolution and frame rate automatically. The control channel (objects, comments, guidance) keeps working.
 
-**"SIMULATED — not a real camera".** The frames come from Sample room mode or the synthetic test script. This is expected in those modes.
+**"SIMULATED: not a real camera".** The frames come from Sample room mode or the synthetic test script. This is expected in those modes.
 
 **Preview looks blurry or low frame rate.** By design: 640 px and about 5 fps to start, adapted down under load or heat. It's a preview, not a video call.
 

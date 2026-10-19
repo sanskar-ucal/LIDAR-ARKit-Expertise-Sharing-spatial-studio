@@ -22,14 +22,11 @@ struct LearnItem: Identifiable, Equatable {
         return "\(actor) \(first.text)"
     }
 
-    /// The step whose keys are shown under the headline.
     var leadStep: NarrationStep? { title == nil ? steps.first : nil }
 
-    /// Steps shown as smaller lines.
     var details: [NarrationStep] { title == nil ? Array(steps.dropFirst()) : steps }
 }
 
-/// Edits the novice can make to their own proposal from the phone.
 enum ProposalEdit {
     case moveToCrosshair
     case rotate(degrees: Double)
@@ -39,5 +36,4 @@ enum ProposalEdit {
     case rename(String)
 }
 
-/// Swatches offered when the novice designs a custom object.
 let proposalColors = ["#b48ead", "#a0764f", "#5b7c99", "#7a8b99", "#d9cbb4", "#c9b79c", "#e0dbd0", "#3f6f5a", "#c0504d", "#2f2f33"]

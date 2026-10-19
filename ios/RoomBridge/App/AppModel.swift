@@ -462,7 +462,7 @@ final class AppModel {
         guard let o = guidedObject else { return }
         endHold(send: true)
         let d = guidance.map { GuidanceMath.distanceToTarget($0, offset: localOffset) } ?? 0
-        let text = String(format: "Done moving “%@” — please check. (%.0f cm from target on my phone)", o.name, d * 100)
+        let text = String(format: "Done moving “%@”, please check. (%.0f cm from target on my phone)", o.name, d * 100)
         control?.send("comment.add", CommentPayload(objectId: o.id, text: text))
     }
 
@@ -834,7 +834,6 @@ extension AppModel {
 extension AppModel {
     var lessonObject: SceneObject? { lesson?.objectId.flatMap { id in objects.first { $0.id == id } } }
 
-    /// The CAD steps a prompt demonstrates, in Blender keys.
     var lessonSteps: [NarrationStep] {
         guard let l = lesson else { return [] }
         if let d = l.demo { return Narrator.describe(name: lessonObject?.name ?? "it", before: d.from, after: d.to) }
@@ -886,7 +885,7 @@ extension AppModel {
         ar?.renderer.showDemo(nil, label: "")
     }
 
-    /// Loops: hold at the start, glide to the end, hold, repeat. Not realistic, just clear.
+    /// Loops: hold at the start, glide to the end, hold, repeat.
     private func demoTick() {
         guard let l = lesson, let d = l.demo, var o = lessonObject else {
             stopDemo()
@@ -918,7 +917,6 @@ extension AppModel {
 // MARK: - Push-to-talk voice notes
 
 extension AppModel {
-    /// Hold to talk. Release sends the clip with an on-device transcript to everyone in the room.
     func beginTalk() {
         guard !recording, !wantsRecording, voiceStatus == nil, isConnected else { return }
         wantsRecording = true

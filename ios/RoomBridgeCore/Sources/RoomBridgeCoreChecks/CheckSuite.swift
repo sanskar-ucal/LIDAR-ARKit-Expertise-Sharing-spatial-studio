@@ -111,7 +111,6 @@ public final class CheckSuite {
                 check(false, "decode \(s["name"]!): \(error)")
             }
         }
-        // Wrong protocol version is refused.
         let bad = #"{"protocolVersion":2,"type":"pong","roomId":"","clientId":"","messageId":"x","payload":{}}"#
         check((try? ServerMessageDecoder.decode(Data(bad.utf8))) == nil, "reject protocol v2")
         // Outgoing envelope shape matches the shared fixture for guidance.attempt.
@@ -256,7 +255,6 @@ public final class CheckSuite {
         }
         check(sawProposal, "decode object.created proposal")
         check(sawResolved, "decode proposal.resolved")
-        // The novice's proposal encodes exactly like the shared fixture.
         let fixture = (fx["validClient"] as! [[String: Any]]).first { ($0["name"] as! String) == "object.propose couch" }!["message"] as! [String: Any]
         let input = ObjectInput(id: "9a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d", kind: .couch, name: "Couch", position: Vec3(0.5, -1.2, -2.5),
                                 rotation: Quat(0, 0, 0, 1), dimensions: Vec3(2, 0.85, 0.9), color: "#5b7c99", textureRef: nil)
@@ -268,7 +266,6 @@ public final class CheckSuite {
                                                  roomId: "r", clientId: "c", originEpoch: 1)
         let u = String(decoding: upd, as: UTF8.self)
         check(u.contains(#""patch":{"rotation":[0,1,0,0]}"#) && u.contains(#""originEpoch":1"#), "update patch only carries changed fields")
-        // A push-to-talk note encodes exactly like the shared fixture.
         let voiceFixture = (fx["validClient"] as! [[String: Any]]).first { ($0["name"] as! String) == "comment.add voice note" }!["message"] as! [String: Any]
         let (_, vdata) = try MessageEncoder.encode(
             type: "comment.add", payload: CommentPayload(objectId: nil, text: "Should the couch face the window?", voice: .init(clipId: "v_abc123", durationMs: 2400)),

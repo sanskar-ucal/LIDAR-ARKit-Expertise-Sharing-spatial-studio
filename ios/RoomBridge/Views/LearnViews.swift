@@ -36,7 +36,6 @@ struct Keycaps: View {
     }
 }
 
-/// Short-lived card under the status bar: what just happened, in CAD terms.
 struct LearnToast: View {
     @Environment(AppModel.self) private var model
     let item: LearnItem
@@ -59,7 +58,7 @@ struct LearnToast: View {
             }
             if let note = item.note { Text(note).font(.caption).italic().foregroundStyle(.secondary) }
             ForEach(item.newConcepts, id: \.self) { c in
-                Label("New skill — \(c.title): \(c.tip)", systemImage: "graduationcap.fill")
+                Label("New skill: \(c.title). \(c.tip)", systemImage: "graduationcap.fill")
                     .font(.caption).foregroundStyle(Theme.accent)
             }
         }
@@ -102,7 +101,6 @@ struct ShortcutLine: View {
     }
 }
 
-/// The novice's learning record: CAD skills met so far and everything that was narrated.
 struct LearnSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss

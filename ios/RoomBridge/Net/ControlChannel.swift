@@ -52,7 +52,6 @@ final class ControlChannel {
         if state != .ended { state = .idle }
     }
 
-    /// Drop the current socket and reconnect immediately (e.g. after returning to foreground).
     func reconnectNow() {
         guard !stopped else { return }
         task?.cancel(with: .goingAway, reason: nil)

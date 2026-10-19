@@ -1,8 +1,6 @@
 import RoomBridgeCore
 import SwiftUI
 
-/// The expert's current prompt: what to do, the Blender keys it teaches, and a "Show me"
-/// ghost demo in AR.
 struct LessonCard: View {
     @Environment(AppModel.self) private var model
 
@@ -21,7 +19,7 @@ struct LessonCard: View {
                         .buttonStyle(.plain).foregroundStyle(.secondary)
                 }
                 if l.state == .done {
-                    Label("Done — \(l.byName) has been told", systemImage: "checkmark.seal.fill").foregroundStyle(Theme.good).font(.callout)
+                    Label("Done. \(l.byName) has been told", systemImage: "checkmark.seal.fill").foregroundStyle(Theme.good).font(.callout)
                 } else {
                     actions(l)
                 }
@@ -77,7 +75,6 @@ struct LessonCard: View {
     }
 }
 
-/// A phone sweeping left and right: how to scan a room, in two seconds.
 struct ScanSweep: View {
     var body: some View {
         TimelineView(.animation) { ctx in
@@ -92,7 +89,6 @@ struct ScanSweep: View {
     }
 }
 
-/// Collapsed prompt, so it does not cover the room.
 struct LessonChip: View {
     @Environment(AppModel.self) private var model
 
@@ -109,7 +105,6 @@ struct LessonChip: View {
     }
 }
 
-/// Hold to talk; release to send to the expert and observers (with an on-device transcript).
 struct TalkButton: View {
     @Environment(AppModel.self) private var model
 

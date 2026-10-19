@@ -478,7 +478,6 @@ export class Room {
     this.insertObject(rec, p.object, null);
   }
 
-  /** The novice suggests an object; it stays a proposal until the expert accepts or rejects it. */
   private proposeObject(rec: ParticipantRecord, p: Payload<"object.propose">): void {
     let pending = 0;
     for (const o of this.objects.values()) if (o.proposal) pending++;

@@ -18,7 +18,6 @@ import type {
 
 export type Connection = "connecting" | "connected" | "reconnecting" | "failed" | "ended";
 
-/** One narrated event: who did what, in Blender terms. */
 export interface FeedItem {
   id: string;
   actorId: string;
@@ -110,7 +109,6 @@ function narrateUpdate(s: RoomState, m: ServerMessage, prev: SceneObject, o: Sce
   });
 }
 
-/** The CAD steps a prompt teaches, in Blender keys. */
 export function lessonSteps(l: Lesson, objects: SceneObject[]): Step[] {
   if (l.demo) return describe(objects.find((o) => o.id === l.objectId)?.name ?? "it", l.demo.from, l.demo.to);
   if (l.preset === "place" && l.kind) {

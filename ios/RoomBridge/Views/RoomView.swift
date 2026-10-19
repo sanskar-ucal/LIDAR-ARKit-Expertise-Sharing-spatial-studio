@@ -203,7 +203,7 @@ struct GuidancePanel: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         Button { model.reportDone() } label: {
-            Label("Done — ask the expert to check", systemImage: "hand.thumbsup")
+            Label("Done: ask the expert to check", systemImage: "hand.thumbsup")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)

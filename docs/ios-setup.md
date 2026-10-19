@@ -43,7 +43,7 @@ Then:
    - **Share preview / Stop preview:** the low-frame-rate live preview (off by default). Starts around 5 fps at 640 px wide and adapts to network speed and phone temperature.
    - **Chat:** participants, the object list with likes/discuss reactions, and comments (object-linked when an object is selected).
    - **More:** **Reset AR origin** (use if virtual objects drifted badly; discards the scan and marks objects stale until the expert re-places them), **Developer panel**, **Leave room**.
-5. When the expert starts a guidance step, the panel shows the axis colour and distance. Press and hold **Hold to move**, walk the phone along the coloured line, and let go. Turning the phone does nothing; only movement along the line counts. One haptic pulse means you are within tolerance. Then tap **Done — ask the expert to check**.
+5. When the expert starts a guidance step, the panel shows the axis colour and distance. Press and hold **Hold to move**, walk the phone along the coloured line, and let go. Turning the phone does nothing; only movement along the line counts. One haptic pulse means you are within tolerance. Then tap **Done: ask the expert to check**.
 
 ## Notes
 

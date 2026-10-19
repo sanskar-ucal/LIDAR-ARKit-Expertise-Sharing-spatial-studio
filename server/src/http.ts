@@ -198,7 +198,6 @@ export function createHttpHandler(config: Config, rooms: RoomRegistry) {
       if (!voiceLimiter.allow(clientIp(req, config))) throw new ProtocolError("rate_limited", "Too many voice requests");
       const room = rooms.get(voice[1]!);
       if (!voice[2] && method === "POST") {
-        // Push-to-talk clip from the novice or the expert; attached to a chat message with comment.add.
         const r = authorize(room, req, ["host", "expert"]);
         const mime = String(req.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
         if (!VOICE_MIME.has(mime)) throw new ProtocolError("bad_request", "Unsupported audio type");

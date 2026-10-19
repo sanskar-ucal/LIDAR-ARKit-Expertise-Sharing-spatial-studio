@@ -56,7 +56,7 @@ for i in 0..<count {
     // Unmissable label.
     ctx.setFillColor(NSColor(calibratedRed: 0.78, green: 0.25, blue: 0.22, alpha: 0.92).cgColor)
     ctx.fill(CGRect(x: 0, y: h - 46, width: w, height: 46))
-    text(ctx, "SYNTHETIC TEST FRAME — not a camera", 14, h - 31, size: 20, color: .white)
+    text(ctx, "SYNTHETIC TEST FRAME: not a camera", 14, h - 31, size: 20, color: .white)
     text(ctx, "RoomBridge preview test · frame \(i + 1)/\(count)", 14, 12, size: 13, color: NSColor(white: 0.15, alpha: 1), bold: false)
 
     guard let image = ctx.makeImage() else { fatalError("image") }

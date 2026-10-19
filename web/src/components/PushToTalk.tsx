@@ -127,7 +127,7 @@ export function PushToTalk({ disabled, localLink, onSend }: Props) {
           onPointerLeave={stop}
           aria-label="Hold to record a voice note"
         >
-          {state === "recording" ? `● Recording ${Math.floor(elapsed / 1000)}s — release to stop` : "🎤 Hold to talk"}
+          {state === "recording" ? `● Recording ${Math.floor(elapsed / 1000)}s, release to stop` : "🎤 Hold to talk"}
         </button>
       )}
       {error && <div className="small warn-text">{error}</div>}
