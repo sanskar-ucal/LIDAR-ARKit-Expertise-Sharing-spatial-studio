@@ -11,7 +11,6 @@ final class SceneRenderer {
         var selectedBy: [String] = []
         var commentCount = 0
         var role: Role? = nil
-        /// The novice's own proposal, waiting for the expert.
         var mineProposal = false
         var editing = false
     }
@@ -78,9 +77,27 @@ final class SceneRenderer {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: "Show me" demo
+
+    private var demo: ObjectNode?
+
+    func showDemo(_ o: SceneObject?, label: String) {
+        guard let o else {
+            demo?.entity.removeFromParent()
+            demo = nil
+            return
+        }
+        let node = demo ?? {
+            let n = ObjectNode(style: .target)
+            root.addChild(n.entity)
+            demo = n
+            return n
+        }()
+        node.update(object: o, label: label, dimmed: false)
+    }
+
     // MARK: Placement preview
 
-    /// Translucent preview of the object the novice is about to propose, at the crosshair.
     func showPlacement(_ o: SceneObject?, label: String) {
         guard let o else {
             placement?.entity.removeFromParent()
@@ -107,7 +124,6 @@ final class SceneRenderer {
             distanceLabel?.removeFromParent(); distanceLabel = nil; distanceText = ""
             return
         }
-        // Ghost target: translucent, labelled.
         let t = target ?? {
             let n = ObjectNode(style: .target)
             root.addChild(n.entity)
@@ -119,7 +135,6 @@ final class SceneRenderer {
         ghost.rotation = g.target.rotation
         t.update(object: ghost, label: "TARGET\nplace it here", dimmed: false)
 
-        // Axis guide through the start pose.
         let key = "\(g.id)|\(g.axis.rawValue)|\(g.start.position)|\(g.target.position)"
         if key != axisKey {
             axisLine?.removeFromParent()

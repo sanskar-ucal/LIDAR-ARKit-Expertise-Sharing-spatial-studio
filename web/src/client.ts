@@ -63,6 +63,35 @@ export class RoomClient {
     return `${protocol === "https:" ? "wss" : "ws"}://${host}`;
   }
 
+  private get httpBase(): string {
+    return this.wsBase.replace(/^ws/, "http");
+  }
+
+  /** Downloads a voice note (the token goes in a header, never in the URL). */
+  async fetchVoice(clipId: string): Promise<Blob> {
+    const roomId = this.state.room?.id;
+    if (!roomId) throw new Error("Not in a room");
+    const res = await fetch(`${this.httpBase}/api/rooms/${roomId}/voice/${encodeURIComponent(clipId)}`, {
+      headers: { authorization: `Bearer ${this.opts.token}` },
+    });
+    if (!res.ok) throw new Error(res.status === 404 ? "This voice note has expired" : `HTTP ${res.status}`);
+    return res.blob();
+  }
+
+  /** Expert only. Returns the clip id to attach to comment.add. */
+  async uploadVoice(audio: Blob): Promise<string> {
+    const roomId = this.state.room?.id;
+    if (!roomId) throw new Error("Not in a room");
+    const res = await fetch(`${this.httpBase}/api/rooms/${roomId}/voice`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${this.opts.token}`, "content-type": audio.type.split(";")[0] || "audio/webm" },
+      body: audio,
+    });
+    const body = (await res.json().catch(() => ({}))) as { clipId?: string; error?: { message?: string } };
+    if (!res.ok || !body.clipId) throw new Error(body.error?.message ?? `HTTP ${res.status}`);
+    return body.clipId;
+  }
+
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

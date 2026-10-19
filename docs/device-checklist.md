@@ -14,7 +14,7 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 ## B. Invites and roles
 
 - [ ] B1. The Invite sheet (**More › Invite people**) shows a QR code; scanning it on the second device opens the viewer join page, and the token disappears from the address bar after loading.
-- [ ] B2. The family member joins and appears on the phone (Chat › People) as Family.
+- [ ] B2. The observer joins and appears on the phone (Chat › People) as Observer (learner).
 - [ ] B3. Pasting the **viewer** link into Blender is refused; pasting the **expert** invite connects as Expert.
 - [ ] B4. Saving the `.blend` file and reopening it: no credential is stored (the token field is empty).
 
@@ -32,7 +32,7 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 - [ ] D3. The picture panel's image is upright and not mirrored on the phone (the sun is at the top right), and faces the same way as in Blender.
 - [ ] D4. Rotating (R) a partition 90° about Blender Z rotates it the same way in AR.
 - [ ] D5. Deleting (X) an object in Blender removes it on the phone and in the browser; its comments stay, marked "(deleted)".
-- [ ] D6. The family viewer's plan view matches the layout seen in AR.
+- [ ] D6. The observer's plan view matches the layout seen in AR.
 - [ ] D7. Adding each library piece in Blender (Doorway, Window, Table, Chair, Couch, Cabinet, Lamp, TV, Custom block): each looks the same in AR as in Blender (legs on the floor, chair back and couch back away from the front, TV screen and window on the front face). Wall pieces start at their usual height.
 
 ## D+. Learning and proposals
@@ -40,10 +40,20 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 - [ ] L1. When the expert moves a table along X in Blender, the phone shows one toast (not one per update) about a second after the drag ends, reading like "Sam moved Table 1 … along the red X axis" with **G X** keycaps and the typed value. The first time, a "New skill" tip appears.
 - [ ] L2. Rotating (R Z 90) and scaling (S Z) in Blender produce "turned … 90°" with **R Z 90** and "resized …: height …" with **S Z**. The Learn sheet ticks the matching CAD skills.
 - [ ] L3. **＋ Add object** opens the library; picking Table shows a translucent preview at the crosshair on the floor; picking Window or TV needs the dot on a wall and faces out from it. **Place & propose** creates it; Blender shows it under **Novice Proposals**, outlined, with a notice.
-- [ ] L4. While waiting, Move to dot, ±15°/90° and the size steppers update the proposal on the phone immediately and in Blender within about a second, and the phone narrates each change ("You turned … — R Z 15"). Rapid taps do not lose the last change.
+- [ ] L4. While waiting, Move to dot, ±15°/90° and the size steppers update the proposal on the phone immediately and in Blender within about a second, and the phone narrates each change ("You turned …" with R Z 15). Rapid taps do not lose the last change.
 - [ ] L5. In Blender, move the proposal, type a note, and **Accept**: the phone buzzes (success), says "approved your … after adjusting it", explains the move in Blender keys and shows the note; the object loses its "YOUR PROPOSAL" label. **Reject** with a note: the phone gives a warning buzz, removes the object and shows the note.
 - [ ] L6. A Custom block can be resized, recoloured and renamed on the phone before the expert accepts it.
-- [ ] L7. The family viewer's "CAD lesson" feed shows the same explanations, and its object list tags pending proposals.
+- [ ] L7. The observer's "CAD lesson" feed shows the same explanations, and its object list tags pending proposals.
+
+## T. Prompts, show-me demos and voice notes
+
+- [ ] T1. Blender **Teach › Scan the room › Send Prompt**: the phone shows the card with the sweeping-phone animation; after **Send room**, the card says done and Blender shows "The novice finished".
+- [ ] T2. Select a table in Blender, **Show: move**, axis X, 0.5 m: on the phone, **Show me** loops a teal ghost sliding 50 cm along the red direction with **G X 0.5**; **Stop** removes it; the real table never moves. Repeat with rotate (90°) and scale (Z, 1.25).
+- [ ] T3. **Place a piece › Chair**: **Open library** on the phone starts placing a chair; proposing it completes the prompt.
+- [ ] T4. Hold the phone's **mic**, say a sentence, release: "Transcribing on this iPhone…", then the note appears in Chat with a play button and the spoken text; Blender's Discussion and the observer's chat show the text; the observer's browser plays it automatically. Record whether the transcript was accurate and whether airplane mode (on-device only) still transcribes.
+- [ ] T5. On the Mac, open the expert invite on `http://localhost:8787`, hold **Hold to talk**, type the text, **Send voice note**: the phone plays it at once (speaker) and shows "🎤 Sam: …"; an observer hears it too.
+- [ ] T6. Opening the expert invite on the LAN address shows the "needs localhost" message with a working link instead of a broken mic button.
+- [ ] T7. An observer cannot send voice notes (no mic button), but can play every note.
 
 ## E. Preview
 
@@ -59,7 +69,7 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 - [ ] F2. **Begin**: the phone shows "Hold to move". Rotating the phone while holding does not move the attempt; walking along the line does.
 - [ ] F3. Exactly one haptic pulse when the attempt gets within tolerance; no buzzing while you stay inside it.
 - [ ] F4. Blender's orange attempt object follows the phone's attempt, and the panel shows the distance and "WITHIN TOLERANCE".
-- [ ] F5. **Done — ask the expert to check** posts a comment linked to the object.
+- [ ] F5. **Done: ask the expert to check** posts a comment linked to the object.
 - [ ] F6. **Reset Attempt** in Blender sends the phone's attempt back to the start, including while the button is held.
 - [ ] F7. **Approve** moves the real object to the attempt position everywhere; the ghost disappears on the phone.
 - [ ] F8. Covering the camera while holding (tracking becomes limited) stops the hold, with a message.
@@ -76,5 +86,5 @@ Setup: `npm ci && npm run build && npm start` on the Mac. Note the printed `http
 
 - [ ] H1. **Sample room** shows the synthetic floor and walls with "SAMPLE ROOM (simulated, no camera)".
 - [ ] H2. **Send room** uploads a scan labelled as simulated in the app, in the browser's Developer details, and in Blender's Room Scan panel ("SAMPLE ROOM (simulated)").
-- [ ] H3. The preview shows the "SIMULATED — not a real camera" badge in the browser.
+- [ ] H3. The preview shows the "SIMULATED: not a real camera" badge in the browser.
 - [ ] H4. During guidance, the ±5 cm buttons move the attempt and trigger the on-target state.

@@ -22,7 +22,7 @@ SCAN_NAME = "RB Room Scan (approximate)"
 DEFAULT_COLORS = {k: c["color"] for k, c in catalog.BY_KIND.items()}
 DEFAULT_DIMENSIONS = {k: tuple(c["dimensions"]) for k, c in catalog.BY_KIND.items()}
 DEFAULT_NAMES = {k: c["label"] for k, c in catalog.BY_KIND.items()}
-# These three predate the catalog and keep their hand-built meshes (the panel's picture UVs).
+# Hand-built meshes; the panel needs UVs on its picture face.
 LEGACY_KINDS = ("pillar", "partition", "panel")
 
 

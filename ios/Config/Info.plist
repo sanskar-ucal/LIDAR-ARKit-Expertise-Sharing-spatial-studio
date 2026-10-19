@@ -32,6 +32,10 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>RoomBridge uses the camera for augmented reality: it shows proposed design objects in your room and, only while you choose to broadcast, shares that view with people you invited.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>RoomBridge records a short voice note only while you hold the talk button, so the expert and observers in your room can hear your question.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>RoomBridge turns your voice notes into text on this iPhone so everyone in the room can also read them. Audio is not sent to Apple for this.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>RoomBridge connects to a room server on your local network (for example, a Mac running the RoomBridge server) so an expert and your family can join.</string>
 	<key>UIApplicationSceneManifest</key>

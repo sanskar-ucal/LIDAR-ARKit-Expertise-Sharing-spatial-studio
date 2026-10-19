@@ -82,4 +82,27 @@ struct RoomAPI {
         await progress(1)
         return try JSONDecoder().decode(CommitResp.self, from: cd).scan
     }
+
+    /// Attach the returned clip id to a comment.add.
+    func uploadVoice(roomId: String, token: String, audio: Data, mime: String) async throws -> String {
+        var req = URLRequest(url: base.appendingPathComponent("api/rooms/\(roomId)/voice"))
+        req.httpMethod = "POST"
+        req.timeoutInterval = 20
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        req.setValue(mime, forHTTPHeaderField: "content-type")
+        req.httpBody = audio
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        try check(data, resp)
+        struct Resp: Decodable { var clipId: String }
+        return try JSONDecoder().decode(Resp.self, from: data).clipId
+    }
+
+    func downloadVoice(roomId: String, token: String, clipId: String) async throws -> Data {
+        var req = URLRequest(url: base.appendingPathComponent("api/rooms/\(roomId)/voice/\(clipId)"))
+        req.timeoutInterval = 20
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        try check(data, resp)
+        return data
+    }
 }

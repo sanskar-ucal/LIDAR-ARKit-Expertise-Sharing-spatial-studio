@@ -44,7 +44,6 @@ public struct Catalog: Decodable, Sendable {
 
     public func kind(_ k: ObjectKind) -> Kind? { kinds.first { $0.kind == k } }
 
-    /// Kinds grouped in catalog order.
     public var groups: [(name: String, kinds: [Kind])] {
         var out: [(name: String, kinds: [Kind])] = []
         for k in kinds {

@@ -199,6 +199,42 @@
           "note": "Nice spot! I moved it 30 cm from the wall so the door can open."
         }
       }
+    },
+    {
+      "name": "lesson.prompt move with a show-me demo",
+      "message": {
+        "protocolVersion": 1,
+        "type": "lesson.prompt",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "m-17",
+        "originEpoch": 1,
+        "payload": {
+          "preset": "move",
+          "text": "Watch how Pillar 1 moves 50 cm along the red X axis",
+          "objectId": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+          "kind": "pillar",
+          "demo": {
+            "from": { "position": [1, 0, -1], "rotation": [0, 0, 0, 1], "dimensions": [0.3, 2.5, 0.3] },
+            "to": { "position": [1.5, 0, -1], "rotation": [0, 0, 0, 1], "dimensions": [0.3, 2.5, 0.3] }
+          }
+        }
+      }
+    },
+    {
+      "name": "comment.add voice note",
+      "message": {
+        "protocolVersion": 1,
+        "type": "comment.add",
+        "roomId": "r_test",
+        "clientId": "c_host",
+        "messageId": "m-18",
+        "payload": {
+          "objectId": null,
+          "text": "Should the couch face the window?",
+          "voice": { "clipId": "v_abc123", "durationMs": 2400 }
+        }
+      }
     }
   ],
   "invalidClient": [
@@ -571,6 +607,62 @@
           "note": "Nice spot! I moved it 30 cm from the wall so the door can open.",
           "before": { "position": [0.5, -1.2, -2.5], "rotation": [0, 0, 0, 1], "dimensions": [2, 0.85, 0.9] },
           "after": { "position": [0.5, -1.2, -2.2], "rotation": [0, 0, 0, 1], "dimensions": [2, 0.85, 0.9] }
+        }
+      }
+    },
+    {
+      "name": "lesson.state open with demo",
+      "message": {
+        "protocolVersion": 1,
+        "type": "lesson.state",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "s-5",
+        "sceneRevision": 9,
+        "originEpoch": 1,
+        "payload": {
+          "lesson": {
+            "id": "l_abc",
+            "preset": "move",
+            "text": "Watch how Pillar 1 moves 50 cm along the red X axis",
+            "objectId": "6f1c1d1e-8a4b-4c39-9d43-2b7f3e0c9a11",
+            "kind": "pillar",
+            "demo": {
+              "from": { "position": [1.2, 0, -1], "rotation": [0, 0, 0, 1], "dimensions": [0.3, 2.5, 0.3] },
+              "to": { "position": [1.7, 0, -1], "rotation": [0, 0, 0, 1], "dimensions": [0.3, 2.5, 0.3] }
+            },
+            "byName": "Sam",
+            "state": "open",
+            "createdAt": 1760000002000,
+            "doneAt": null,
+            "originEpoch": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "comment.added voice note",
+      "message": {
+        "protocolVersion": 1,
+        "type": "comment.added",
+        "roomId": "r_test",
+        "clientId": "c_expert",
+        "messageId": "s-6",
+        "sceneRevision": 9,
+        "originEpoch": 1,
+        "payload": {
+          "comment": {
+            "id": "k_voice1",
+            "objectId": null,
+            "objectName": null,
+            "authorId": "c_expert",
+            "authorName": "Sam",
+            "authorRole": "expert",
+            "text": "Put the couch against that wall",
+            "createdAt": 1760000003000,
+            "objectDeleted": false,
+            "voice": { "clipId": "v_abc123", "durationMs": 2400, "mime": "audio/mp4" }
+          }
         }
       }
     }

@@ -109,6 +109,28 @@ describe("RoomClient against the real server", () => {
     host.ws.close();
   }, 15000);
 
+  it("the expert's browser sends a voice note that an observer can play", async () => {
+    const res = await fetch(`http://${base}/api/rooms`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hostName: "Host" }) });
+    const room = await res.json();
+    const expert = new RoomClient({ code: room.code, token: room.expertToken, displayName: "Sam", wsBase: `ws://${base}` });
+    const viewer = new RoomClient({ code: room.code, token: room.viewerToken, displayName: "Observer", wsBase: `ws://${base}` });
+    expert.start();
+    viewer.start();
+    await until(() => expert.state.room !== null && viewer.state.room !== null);
+    const audio = new Blob([new Uint8Array([26, 69, 223, 163, 1, 2, 3])], { type: "audio/webm;codecs=opus" });
+    const clipId = await expert.uploadVoice(audio);
+    expect(expert.send("comment.add", { objectId: null, text: "Turn the chair to face the window", voice: { clipId, durationMs: 1500 } })).toBe(true);
+    await until(() => viewer.state.comments.some((c) => c.voice?.clipId === clipId));
+    expect(viewer.state.feed[0]?.title).toBe("🎤 Sam: Turn the chair to face the window");
+    const blob = await viewer.fetchVoice(clipId);
+    expect(blob.type).toBe("audio/webm");
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(new Uint8Array([26, 69, 223, 163, 1, 2, 3]));
+    // Observers listen and read, but cannot upload.
+    await expect(viewer.uploadVoice(audio)).rejects.toThrow();
+    expert.stop();
+    viewer.stop();
+  });
+
   it("reports a bad invite without retrying", async () => {
     const res = await fetch(`http://${base}/api/rooms`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hostName: "Host" }) });
     const room = await res.json();

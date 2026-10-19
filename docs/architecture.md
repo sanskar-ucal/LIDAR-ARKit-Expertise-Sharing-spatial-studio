@@ -16,7 +16,7 @@
                                                                        │ WS control │ WS preview
  ┌───────────────┐                                                     │            ▼
  │ Browser       │ ◀───────────────────────────────────────────────────┘   latest frame only
- │ (family)      │
+ │ (observers)   │
  └───────────────┘
 ```
 
@@ -25,9 +25,9 @@
 | Component | Owns |
 | --- | --- |
 | iPhone | The **coordinate frame** (ARKit world origin), the LiDAR scan, the preview camera, and the physical attempt offset during guidance. Renders everything locally against its own tracking, so network delay never makes AR content swim. |
-| Server | The **shared scene**: object list with per-object revisions, guidance state, comments, reactions, participants, scan metadata and bytes. Validates every message, enforces roles, and relays preview frames. Keeps everything in memory. |
-| Blender | **Authoring**: creating and editing objects, setting guidance targets, approving. Treats the scan as a locked reference. |
-| Browser | **Watching and discussing**: preview, plan view, captions, comments, reactions. Cannot edit. |
+| Server | The **shared scene**: object list with per-object revisions, novice proposals, guidance state, the current teaching prompt, comments (with voice clips), reactions, participants, scan metadata and bytes. Validates every message, enforces roles, and relays preview frames. Keeps everything in memory. |
+| Blender | **Authoring and teaching**: creating and editing objects, reviewing the novice's proposals, sending prompts with show-me demos, setting guidance targets, approving. Treats the scan as a locked reference. |
+| Browser | **Watching, learning and discussing** (observers): preview, plan view, prompts, captions, the CAD lesson feed, comments, voice notes, reactions. Cannot edit. The expert can also open it on the Mac as a push-to-talk companion. |
 
 ## Key decisions
 

@@ -36,7 +36,6 @@ function StepLine({ step, lead }: { step: Step; lead?: string }) {
   );
 }
 
-/** Every change in the room, explained in Blender terms (a CAD lesson for the novice and family). */
 export function LearningFeed({ feed }: { feed: FeedItem[] }) {
   return (
     <section className="card">
@@ -45,9 +44,9 @@ export function LearningFeed({ feed }: { feed: FeedItem[] }) {
       <ul className="feed">
         {feed.slice(0, 12).map((f) => (
           <li key={f.id} className={`feed-item ${f.tone}`}>
-            <StepLine step={f.steps[0]!} lead={f.actor} />
-            {f.steps.slice(1).map((s, i) => (
-              <StepLine key={i} step={s} lead="then" />
+            {f.title ? <div className="step">{f.title}</div> : f.steps[0] && <StepLine step={f.steps[0]} lead={f.actor} />}
+            {(f.title ? f.steps : f.steps.slice(1)).map((s, i) => (
+              <StepLine key={i} step={s} lead={f.title ? undefined : "then"} />
             ))}
             {f.note && <div className="muted small note">“{f.note}”</div>}
           </li>

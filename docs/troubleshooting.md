@@ -17,7 +17,7 @@
 
 **"Room code or invitation is not valid".** The room ended or expired (30 minutes idle, 12 hours maximum by default, and server restarts end all rooms), or the link was cut off when copying. Create a new room on the phone and share fresh links.
 
-**Blender rejects the invite as a viewer link.** You pasted the family link. Use the **expert invite** from the phone's Invite screen.
+**Blender rejects the invite as a viewer link.** You pasted the observer (viewer) link. Use the **expert invite** from the phone's Invite screen.
 
 **"Too many join attempts".** The server rate-limits joining (30 attempts per minute per IP, and 10 failed attempts per minute). Wait a minute.
 
@@ -27,9 +27,9 @@
 
 **Viewers see "Preview paused".** The phone user hasn't tapped **Share preview**, or the app is in the background (iOS stops the camera there).
 
-**"Frozen N s — connection slow".** No new frame for over 2 seconds. Usually Wi-Fi congestion; the phone lowers resolution and frame rate automatically. The control channel (objects, comments, guidance) keeps working.
+**"Frozen N s: connection slow".** No new frame for over 2 seconds. Usually Wi-Fi congestion; the phone lowers resolution and frame rate automatically. The control channel (objects, comments, guidance) keeps working.
 
-**"SIMULATED — not a real camera".** The frames come from Sample room mode or the synthetic test script. This is expected in those modes.
+**"SIMULATED: not a real camera".** The frames come from Sample room mode or the synthetic test script. This is expected in those modes.
 
 **Preview looks blurry or low frame rate.** By design: 640 px and about 5 fps to start, adapted down under load or heat. It's a preview, not a video call.
 

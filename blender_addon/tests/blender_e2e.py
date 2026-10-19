@@ -286,6 +286,29 @@ def main(base):
     check(pump(lambda: chair_id not in sync._index()), "rejected proposal removed in Blender")
     check(sync.ctrl.proposal_log and sync.ctrl.proposal_log[0]["outcome"] == "rejected", "Blender keeps a log of decisions")
 
+    # Teaching prompt with a show-me demo on the remote partition: 50 cm along Blender X.
+    part = sync._index().get(oid)
+    msg = sync.send_lesson("move", part, axis="X", distance=0.5)
+    check(msg.startswith("Prompt sent"), msg)
+    les = phone.wait(lambda m: m["type"] == "lesson.state" and m["payload"]["lesson"])["payload"]["lesson"]
+    check(les["preset"] == "move" and close(les["demo"]["to"]["position"], [-0.5, 0, -1]) and "red X axis" in les["text"],
+          f"phone gets the prompt: {les['text']}")
+    phone.send("lesson.done", {"lessonId": les["id"]})
+    check(pump(lambda: sync.ctrl.lesson and sync.ctrl.lesson["state"] == "done"), "novice's 'done' reaches Blender")
+    check("finished" in sync.ctrl.last_info, "expert is told: " + sync.ctrl.last_info)
+    sync.clear_lesson()
+    check(pump(lambda: sync.ctrl.lesson is None), "prompt cleared")
+    check(sync.send_lesson("rotate", None).startswith("select"), "demo prompts need a selected object")
+
+    # The novice's push-to-talk note shows up in Blender's Discussion panel.
+    up = urllib.request.Request(f"{base}/api/rooms/{room['roomId']}/voice", data=b"\x00\x00\x00\x18ftypM4A ", method="POST",
+                                headers={"authorization": f"Bearer {room['hostToken']}", "content-type": "audio/mp4"})
+    clip_id = json.loads(urllib.request.urlopen(up).read())["clipId"]
+    phone.send("comment.add", {"objectId": None, "text": "Should the couch face the window?", "voice": {"clipId": clip_id, "durationMs": 2400}})
+    check(pump(lambda: any(k.get("voice") for k in sync.ctrl.comments)), "voice note with transcript reaches Blender")
+    errors, bad = draw_all_panels()
+    check(not errors and not bad, f"panels draw with a prompt and a voice note (errors {errors}, icons {bad})")
+
     sync.disconnect()
     roombridge.unregister()
     check(not bpy.app.timers.is_registered(sync._tick), "disconnect removes the timer")

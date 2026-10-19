@@ -82,4 +82,11 @@ export const LIMITS = {
   msgBurst: 80,
   commentsPerWindow: 5,
   commentWindowMs: 10_000,
+  voiceMaxBytes: 1024 * 1024,
+  voiceMaxClips: 40,
+  voiceMaxDurationMs: 60_000,
+  voiceUnattachedTtlMs: 120_000,
 } as const;
+
+/** Audio formats the phone (AAC in MP4) and browsers (WebM/Opus or MP4) record. */
+export const VOICE_MIME = new Set(["audio/mp4", "audio/m4a", "audio/x-m4a", "audio/aac", "audio/webm", "audio/ogg", "audio/mpeg"]);

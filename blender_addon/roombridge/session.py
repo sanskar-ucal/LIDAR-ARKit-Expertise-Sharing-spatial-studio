@@ -193,7 +193,6 @@ class RoomSession:
     def _pump(self, ws: WebSocketClient) -> None:
         last_ping = time.monotonic()
         while not self._stop.is_set():
-            # Send everything queued (bounded by queue size).
             for _ in range(100):
                 try:
                     env = self.outbox.get_nowait()

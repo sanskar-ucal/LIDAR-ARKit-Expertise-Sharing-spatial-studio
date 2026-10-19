@@ -72,7 +72,8 @@ Every control message (both directions) is a JSON object:
 * `sceneRevision`: on server messages, the room's scene revision after the
   change. Clients may omit it.
 * `originEpoch`: **required** on messages that carry geometry (`object.create`,
-  `object.propose`, `object.update`, `guidance.set`, `guidance.begin`, `guidance.attempt`). If it is
+  `object.propose`, `object.update`, `guidance.set`, `guidance.begin`, `guidance.attempt`,
+  `lesson.prompt`). If it is
   not the room's current epoch, the server replies `error` `stale_epoch`.
 * Every client message except `ping` is answered with either
   `ack { ackOf }` or `error { ackOf, code, message }`.
@@ -111,6 +112,9 @@ Every control message (both directions) is a JSON object:
 | `object.update` / `object.delete` | own pending proposals | yes | |
 | `object.propose` | yes | | |
 | `proposal.accept` / `proposal.reject` | | yes | |
+| `lesson.prompt` / `lesson.clear` | | yes | |
+| `lesson.done` | yes | | |
+| `comment.add` with `voice` (and `POST .../voice`) | yes | yes | |
 | `guidance.set` / `guidance.begin` / `guidance.approve` / `guidance.cancel` | | yes | |
 | `guidance.reset` | yes | yes | |
 | `guidance.attempt` | yes | | |
@@ -135,7 +139,9 @@ Forbidden messages get `error` `forbidden`.
 | `object.propose` | `{ object: ObjectInput }` (host) |
 | `proposal.accept` / `proposal.reject` | `{ id, note? (1-300) }` (expert) |
 | `selection` | `{ objectId: string \| null }` |
-| `comment.add` | `{ objectId: string \| null, text (1-500) }` (5 per 10 s per client) |
+| `comment.add` | `{ objectId: string \| null, text (1-500), voice?: { clipId, durationMs (1-60000) } }` (5 per 10 s per client) |
+| `lesson.prompt` | `{ preset: "scan"\|"move"\|"rotate"\|"scale"\|"place"\|"custom", text (1-200), objectId?, kind?, demo?: { from: ObjectPose, to: ObjectPose } }` (expert) |
+| `lesson.done` / `lesson.clear` | `{ lessonId }` (host / expert) |
 | `reaction.toggle` | `{ objectId, kind: "like" \| "discuss" }` |
 | `guidance.set` | `{ objectId, axis: "x"\|"y"\|"z", targetPosition: Vec3, tolerance? (0.01-0.5, default 0.05) }` |
 | `guidance.begin` | `{ guidanceId }` |
@@ -159,13 +165,14 @@ spheres, its default size and colour, where it is placed (floor or wall), and it
 | --- | --- |
 | `auth.ok` | `{ clientId, role, roomId, code, hostName, previewTicket, limits }` (always followed by `scene.snapshot`) |
 | `auth.error` | `{ code, message }`, after which the socket is closed |
-| `scene.snapshot` | `{ room, participants, objects, guidance, comments (last 100), reactions, scan, preview }` |
+| `scene.snapshot` | `{ room, participants, objects, guidance, lesson, comments (last 100), reactions, scan, preview }` |
 | `presence` | `{ participants }` |
 | `object.created` / `object.updated` | `{ object: SceneObject }` |
 | `object.deleted` | `{ id }` (comments keep `objectDeleted: true`) |
 | `comment.added` | `{ comment }` |
 | `reaction.updated` | `{ objectId, like: clientId[], discuss: clientId[] }` |
 | `guidance.state` | `{ guidance: Guidance \| null }` |
+| `lesson.state` | `{ lesson: Lesson \| null }` |
 | `proposal.resolved` | `{ objectId, objectName, kind, outcome: "accepted"\|"adjusted"\|"rejected", byName, note, before: ObjectPose, after: ObjectPose \| null }` |
 | `scan.ready` | `{ scan: ScanMeta }` |
 | `preview.status` | `{ state: "live"\|"paused"\|"offline", hostConnected, viewers, targetFps, width }` |
@@ -178,6 +185,35 @@ spheres, its default size and colour, where it is placed (floor or wall), and it
 
 `ObjectPose = { position, rotation, dimensions }`. `outcome` is `adjusted` when the expert
 moved, turned or resized the proposal (by more than 1 cm, 1 degree or 5 mm) before accepting.
+
+### Lessons (expert prompts with "show me" demos)
+
+`Lesson = { id, preset, text, objectId, kind, demo: null | { from: ObjectPose, to: ObjectPose }, byName, state: "open"|"done", createdAt, doneAt, originEpoch }`
+
+One prompt is active at a time; a new `lesson.prompt` replaces it. `move`, `rotate` and
+`scale` prompts carry a demo: two poses of a real object, which the phone loops as a
+translucent ghost (not a physical simulation) and explains in Blender keys with the
+narration rules below. The server completes a prompt itself when the novice does the task:
+`scan` when a scan is committed, `place` when the host proposes an object of `kind` (or any
+kind if `kind` is null). Other prompts are completed by the host's `lesson.done`. Deleting
+the prompt's object or resetting the AR origin (for prompts with a demo) clears it. The
+current lesson is part of `scene.snapshot`.
+
+### Voice notes (push-to-talk)
+
+1. The host or expert uploads a clip: `POST /api/rooms/:roomId/voice` with
+   `Authorization: Bearer <token>` and `Content-Type` one of `audio/mp4`, `audio/m4a`,
+   `audio/x-m4a`, `audio/aac`, `audio/webm`, `audio/ogg`, `audio/mpeg`; at most 1 MiB.
+   The response is `{ clipId }`.
+2. It attaches the clip to a chat message: `comment.add { objectId, text, voice: { clipId, durationMs } }`.
+   `text` is the transcript (made on the phone with on-device speech recognition) or a
+   caption typed by the expert, or `"(voice note)"`. A clip can be attached once, only by
+   the role that uploaded it; observers cannot send voice notes.
+3. Everyone, observers included, receives `comment.added` with
+   `comment.voice = { clipId, durationMs, mime }` and plays it with
+   `GET /api/rooms/:roomId/voice/:clipId` (any room token). Unattached clips are not
+   playable and expire after 2 minutes; a room keeps at most 40 clips, in memory only, and
+   deletes them when it ends.
 
 ### Learning captions
 

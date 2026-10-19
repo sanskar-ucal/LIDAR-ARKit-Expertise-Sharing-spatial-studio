@@ -31,10 +31,17 @@ struct RoomView: View {
                     LearnToast(item: item).onTapGesture { showLearn = true }
                 }
                 Spacer()
+                HStack(alignment: .bottom) {
+                    LessonChip()
+                    Spacer()
+                    TalkButton()
+                }
                 if model.placingKind != nil {
                     PlacementPanel()
                 } else if model.guidance != nil {
                     GuidancePanel()
+                } else if model.lesson != nil && !model.lessonCollapsed {
+                    LessonCard()
                 } else if model.editingProposal != nil {
                     ProposalPanel()
                 } else {
@@ -196,7 +203,7 @@ struct GuidancePanel: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         Button { model.reportDone() } label: {
-            Label("Done — ask the expert to check", systemImage: "hand.thumbsup")
+            Label("Done: ask the expert to check", systemImage: "hand.thumbsup")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)

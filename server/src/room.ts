@@ -12,7 +12,9 @@ import {
   validatePosition,
   validateRotation,
   type ClientMessage,
+  type LessonPreset,
   type ObjectInput,
+  type ObjectKind,
   type Payload,
   type Role,
 } from "./protocol.js";
@@ -76,6 +78,31 @@ export interface Comment {
   text: string;
   createdAt: number;
   objectDeleted: boolean;
+  /** Push-to-talk clip; `text` is its transcript or a typed caption. */
+  voice: { clipId: string; durationMs: number; mime: string } | null;
+}
+
+interface VoiceClip {
+  data: Buffer;
+  mime: string;
+  role: Role;
+  createdAt: number;
+  attached: boolean;
+}
+
+export interface Lesson {
+  id: string;
+  preset: LessonPreset;
+  text: string;
+  objectId: string | null;
+  kind: ObjectKind | null;
+  /** A non-realistic "show me" animation: the phone loops a ghost of the object from `from` to `to`. */
+  demo: { from: ObjectPose; to: ObjectPose } | null;
+  byName: string;
+  state: "open" | "done";
+  createdAt: number;
+  doneAt: number | null;
+  originEpoch: number;
 }
 
 export interface Pose {
@@ -151,6 +178,8 @@ export class Room {
   private comments: Comment[] = [];
   private reactions = new Map<string, { like: Set<string>; discuss: Set<string> }>();
   private guidance: Guidance | null = null;
+  private lesson: Lesson | null = null;
+  private voiceClips = new Map<string, VoiceClip>();
   private hostPreview: HostPreview = { state: "paused", targetFps: 0, width: 0 };
   private dedupe = new BoundedSet(LIMITS.dedupeEntries);
   private commentLimiter = new WindowLimiter(LIMITS.commentsPerWindow, LIMITS.commentWindowMs, 100);
@@ -313,6 +342,8 @@ export class Room {
     this.staging = null;
     this.comments = [];
     this.objects.clear();
+    this.voiceClips.clear();
+    this.lesson = null;
     log.info("room ended", { room: this.code, reason });
     this.onEnded?.(this);
   }
@@ -420,6 +451,12 @@ export class Room {
         return this.cancelGuidance(rec, p);
       case "preview.status":
         return this.setPreviewStatus(p);
+      case "lesson.prompt":
+        return this.promptLesson(rec, p);
+      case "lesson.done":
+        return this.lessonDone(rec, p);
+      case "lesson.clear":
+        return this.clearLesson(rec, p);
       default:
         throw new ProtocolError("bad_request", `Unhandled type ${msg.type}`);
     }
@@ -431,6 +468,7 @@ export class Room {
     this.scan = null;
     this.staging = null;
     this.guidance = null;
+    if (this.lesson?.demo) this.lesson = null; // its demo poses belong to the old origin
     log.info("origin reset", { room: this.code, epoch: this.originEpoch });
     const snap = this.envelope("scene.snapshot", rec.clientId, this.snapshotPayload());
     this.broadcast(snap);
@@ -440,7 +478,6 @@ export class Room {
     this.insertObject(rec, p.object, null);
   }
 
-  /** The novice suggests an object; it stays a proposal until the expert accepts or rejects it. */
   private proposeObject(rec: ParticipantRecord, p: Payload<"object.propose">): void {
     let pending = 0;
     for (const o of this.objects.values()) if (o.proposal) pending++;
@@ -454,6 +491,8 @@ export class Room {
       proposedAt: this.now(),
       novice: pose({ ...input, rotation: validateRotation(input.rotation) }),
     });
+    const l = this.lesson;
+    if (l && l.state === "open" && l.preset === "place" && (l.kind === null || l.kind === input.kind)) this.completeLesson(rec.clientId);
   }
 
   private insertObject(rec: ParticipantRecord, input: ObjectInput, proposal: ProposalInfo | null): void {
@@ -570,6 +609,10 @@ export class Room {
       this.guidance = null;
       this.broadcastGuidance(rec.clientId);
     }
+    if (this.lesson?.objectId === id) {
+      this.lesson = null;
+      this.broadcastLesson(rec.clientId);
+    }
     if (selectionChanged) this.broadcastPresence();
     // The expert deleting a proposal (or rejecting it) is a rejection the novice should hear about.
     if (obj.proposal && rec.role === "expert") this.broadcastResolution(rec, obj, "rejected", rejectionNote, null);
@@ -589,10 +632,101 @@ export class Room {
     const objectId = p.objectId?.toLowerCase() ?? null;
     const obj = objectId ? this.objects.get(objectId) : undefined;
     if (objectId && !obj) throw new ProtocolError("not_found", "That object no longer exists");
-    this.pushComment(rec, obj ?? null, p.text);
+    let voice: Comment["voice"] = null;
+    if (p.voice) {
+      if (rec.role === "viewer") throw new ProtocolError("forbidden", "Observers can listen and read, but not send voice notes");
+      const clip = this.voiceClips.get(p.voice.clipId);
+      if (!clip || clip.attached || clip.role !== rec.role) throw new ProtocolError("not_found", "Unknown or already used voice clip");
+      clip.attached = true;
+      voice = { clipId: p.voice.clipId, durationMs: p.voice.durationMs, mime: clip.mime };
+    }
+    this.pushComment(rec, obj ?? null, p.text, voice);
   }
 
-  private pushComment(rec: ParticipantRecord, obj: SceneObject | null, text: string): void {
+  // ---------------------------------------------------------------- voice clips
+
+  /** Stores an uploaded push-to-talk clip until a comment.add attaches it. In memory only. */
+  addVoiceClip(role: Role, mime: string, data: Buffer): string {
+    const now = this.now();
+    for (const [id, c] of this.voiceClips) {
+      if (!c.attached && now - c.createdAt > LIMITS.voiceUnattachedTtlMs) this.voiceClips.delete(id);
+    }
+    while (this.voiceClips.size >= LIMITS.voiceMaxClips) {
+      const oldest = this.voiceClips.keys().next().value!;
+      this.voiceClips.delete(oldest);
+    }
+    const id = randomId("v_", 12);
+    this.voiceClips.set(id, { data, mime, role, createdAt: now, attached: false });
+    this.lastActivity = now;
+    return id;
+  }
+
+  /** Attached clips can be played by everyone in the room. */
+  getVoiceClip(id: string): { data: Buffer; mime: string } | null {
+    const c = this.voiceClips.get(id);
+    return c && c.attached ? { data: c.data, mime: c.mime } : null;
+  }
+
+  // ---------------------------------------------------------------- lessons
+
+  private promptLesson(rec: ParticipantRecord, p: Payload<"lesson.prompt">): void {
+    const objectId = p.objectId?.toLowerCase() ?? null;
+    const obj = objectId ? this.objects.get(objectId) : undefined;
+    if (objectId && !obj) throw new ProtocolError("not_found", "That object no longer exists");
+    let demo: Lesson["demo"] = null;
+    if (p.demo) {
+      for (const d of [p.demo.from, p.demo.to]) {
+        validatePosition(d.position);
+        validateDimensions(obj?.kind ?? "block", d.dimensions);
+      }
+      demo = {
+        from: { ...pose(p.demo.from), rotation: validateRotation(p.demo.from.rotation) },
+        to: { ...pose(p.demo.to), rotation: validateRotation(p.demo.to.rotation) },
+      };
+    }
+    this.lesson = {
+      id: randomId("l_"),
+      preset: p.preset,
+      text: p.text,
+      objectId,
+      kind: p.kind ?? obj?.kind ?? null,
+      demo,
+      byName: rec.displayName,
+      state: "open",
+      createdAt: this.now(),
+      doneAt: null,
+      originEpoch: this.originEpoch,
+    };
+    this.broadcastLesson(rec.clientId);
+  }
+
+  private requireLesson(id: string): Lesson {
+    if (!this.lesson || this.lesson.id !== id) throw new ProtocolError("not_found", "No such lesson");
+    return this.lesson;
+  }
+
+  private lessonDone(rec: ParticipantRecord, p: Payload<"lesson.done">): void {
+    this.requireLesson(p.lessonId);
+    this.completeLesson(rec.clientId);
+  }
+
+  private completeLesson(by: string): void {
+    if (!this.lesson || this.lesson.state === "done") return;
+    this.lesson = { ...this.lesson, state: "done", doneAt: this.now() };
+    this.broadcastLesson(by);
+  }
+
+  private clearLesson(rec: ParticipantRecord, p: Payload<"lesson.clear">): void {
+    this.requireLesson(p.lessonId);
+    this.lesson = null;
+    this.broadcastLesson(rec.clientId);
+  }
+
+  private broadcastLesson(originClientId: string): void {
+    this.broadcast(this.envelope("lesson.state", originClientId, { lesson: this.lesson }));
+  }
+
+  private pushComment(rec: ParticipantRecord, obj: SceneObject | null, text: string, voice: Comment["voice"] = null): void {
     const comment: Comment = {
       id: randomId("k_"),
       objectId: obj?.id ?? null,
@@ -603,6 +737,7 @@ export class Room {
       text,
       createdAt: this.now(),
       objectDeleted: false,
+      voice,
     };
     this.comments.push(comment);
     if (this.comments.length > LIMITS.maxComments) this.comments.splice(0, this.comments.length - LIMITS.maxComments);
@@ -756,6 +891,7 @@ export class Room {
     this.sceneRevision += 1;
     this.lastActivity = this.now();
     this.broadcast(this.envelope("scan.ready", "server", { scan: meta }));
+    if (this.lesson?.state === "open" && this.lesson.preset === "scan") this.completeLesson("server");
   }
 
   // ---------------------------------------------------------------- output
@@ -795,6 +931,7 @@ export class Room {
       participants: this.publicParticipants(),
       objects: [...this.objects.values()].map((o) => this.serializeObject(o)),
       guidance: this.guidance,
+      lesson: this.lesson,
       comments: this.comments.slice(-LIMITS.snapshotComments),
       reactions,
       scan: this.scan?.meta ?? null,

@@ -109,6 +109,23 @@ export interface Comment {
   text: string;
   createdAt: number;
   objectDeleted: boolean;
+  /** Push-to-talk clip; `text` is its transcript or caption. */
+  voice?: { clipId: string; durationMs: number; mime: string } | null;
+}
+
+/** An expert's teaching prompt, optionally with a "show me" demo on a real object. */
+export interface Lesson {
+  id: string;
+  preset: "scan" | "move" | "rotate" | "scale" | "place" | "custom";
+  text: string;
+  objectId: string | null;
+  kind: ObjectKind | null;
+  demo: { from: ObjectPose; to: ObjectPose } | null;
+  byName: string;
+  state: "open" | "done";
+  createdAt: number;
+  doneAt: number | null;
+  originEpoch: number;
 }
 
 export interface Reactions {
@@ -147,6 +164,7 @@ export interface Snapshot {
   participants: Participant[];
   objects: SceneObject[];
   guidance: Guidance | null;
+  lesson?: Lesson | null;
   comments: Comment[];
   reactions: Record<string, Reactions>;
   scan: ScanMeta | null;
@@ -185,7 +203,7 @@ export const AXIS_INFO: Record<Axis, { color: string; css: string; direction: st
 export const ROLE_LABEL: Record<Role, string> = {
   host: "Novice (phone)",
   expert: "Expert (Blender)",
-  viewer: "Family",
+  viewer: "Observer (learner)",
 };
 
 /** Parses an invite link `https://host/r/CODE#t=TOKEN` or the current location. */

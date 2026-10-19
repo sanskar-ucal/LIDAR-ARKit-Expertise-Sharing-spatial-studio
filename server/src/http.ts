@@ -1,7 +1,7 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
-import { LIMITS, type Config } from "./config.js";
+import { LIMITS, VOICE_MIME, type Config } from "./config.js";
 import { log } from "./log.js";
 import { ProtocolError, type Role } from "./protocol.js";
 import { WindowLimiter } from "./ratelimit.js";
@@ -120,6 +120,7 @@ function baseUrl(req: IncomingMessage, config: Config): string {
 export function createHttpHandler(config: Config, rooms: RoomRegistry) {
   const createLimiter = new WindowLimiter(10, 10 * 60_000);
   const scanLimiter = new WindowLimiter(200, 60_000);
+  const voiceLimiter = new WindowLimiter(120, 60_000);
   const webRoot = resolve(config.webDist);
 
   async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -190,6 +191,30 @@ export function createHttpHandler(config: Config, rooms: RoomRegistry) {
         return;
       }
       throw new ProtocolError("not_found", "Unknown scan route");
+    }
+
+    const voice = /^\/api\/rooms\/([A-Za-z0-9_-]{1,64})\/voice(?:\/([A-Za-z0-9_-]{1,64}))?$/.exec(path);
+    if (voice) {
+      if (!voiceLimiter.allow(clientIp(req, config))) throw new ProtocolError("rate_limited", "Too many voice requests");
+      const room = rooms.get(voice[1]!);
+      if (!voice[2] && method === "POST") {
+        const r = authorize(room, req, ["host", "expert"]);
+        const mime = String(req.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
+        if (!VOICE_MIME.has(mime)) throw new ProtocolError("bad_request", "Unsupported audio type");
+        const data = await readBody(req, LIMITS.voiceMaxBytes);
+        if (data.length === 0) throw new ProtocolError("bad_request", "Empty voice clip");
+        const role = r.roleForToken(bearer(req))!;
+        return send(res, 201, { clipId: r.addVoiceClip(role, mime, data) });
+      }
+      if (voice[2] && method === "GET") {
+        const r = authorize(room, req, ["host", "expert", "viewer"]);
+        const clip = r.getVoiceClip(voice[2]);
+        if (!clip) throw new ProtocolError("not_found", "Voice note not found (it may have expired)");
+        res.writeHead(200, { "content-type": clip.mime, "content-length": clip.data.length, "cache-control": "no-store" });
+        res.end(clip.data);
+        return;
+      }
+      throw new ProtocolError("not_found", "Unknown voice route");
     }
 
     if (path.startsWith("/api/")) throw new ProtocolError("not_found", "Unknown API route");

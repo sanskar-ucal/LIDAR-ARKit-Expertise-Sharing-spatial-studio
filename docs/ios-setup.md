@@ -36,14 +36,14 @@ Then:
 
 1. Start the server on the Mac (`npm run build && npm start`) and note the printed `http://<mac-ip>:8787` address.
 2. In the app, enter that address (for example `http://10.0.0.61:8787`) and your name.
-3. Tap **Create room (LiDAR scan)**. Allow **Camera** and **Local Network** when iOS asks. If you declined Local Network by accident: Settings › Privacy & Security › Local Network › RoomBridge.
+3. Tap **Create room (LiDAR scan)**. Allow **Camera** and **Local Network** when iOS asks. If you declined Local Network by accident: Settings › Privacy & Security › Local Network › RoomBridge. The first time you hold the **mic** button, iOS also asks for **Microphone** and **Speech Recognition**; transcription runs on the iPhone only, and if your language has no on-device model the note is sent as audio without text.
 4. Use the bottom bar:
    - **QR icon (Invite):** viewer QR code and link, the expert invite (grants editing; send only to the designer), and the room code.
    - **Send room:** simplifies the current LiDAR mesh (up to about 120k vertices / 200k triangles) and uploads it. After a successful upload the mesh overlay is hidden and the scan is frozen.
    - **Share preview / Stop preview:** the low-frame-rate live preview (off by default). Starts around 5 fps at 640 px wide and adapts to network speed and phone temperature.
    - **Chat:** participants, the object list with likes/discuss reactions, and comments (object-linked when an object is selected).
    - **More:** **Reset AR origin** (use if virtual objects drifted badly; discards the scan and marks objects stale until the expert re-places them), **Developer panel**, **Leave room**.
-5. When the expert starts a guidance step, the panel shows the axis colour and distance. Press and hold **Hold to move**, walk the phone along the coloured line, and let go. Turning the phone does nothing; only movement along the line counts. One haptic pulse means you are within tolerance. Then tap **Done — ask the expert to check**.
+5. When the expert starts a guidance step, the panel shows the axis colour and distance. Press and hold **Hold to move**, walk the phone along the coloured line, and let go. Turning the phone does nothing; only movement along the line counts. One haptic pulse means you are within tolerance. Then tap **Done: ask the expert to check**.
 
 ## Notes
 

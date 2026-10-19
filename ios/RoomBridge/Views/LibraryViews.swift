@@ -1,7 +1,6 @@
 import RoomBridgeCore
 import SwiftUI
 
-/// The object library: prebuilt pieces the novice can propose, each with its CAD lesson.
 struct LibrarySheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -97,7 +96,6 @@ struct PlacementPanel: View {
     }
 }
 
-/// Edit your own proposal while it waits for the expert. Every change is narrated in Blender keys.
 struct ProposalPanel: View {
     @Environment(AppModel.self) private var model
     @State private var renaming = false
@@ -170,7 +168,6 @@ struct ProposalPanel: View {
     }
 }
 
-/// Quick access to pending proposals when nothing else is on screen.
 struct ProposalsStrip: View {
     @Environment(AppModel.self) private var model
 
