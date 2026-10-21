@@ -56,13 +56,39 @@ RoomBridge server listening on [::]:8787
 
 Use that address everywhere below (`10.0.0.61` is just an example; yours will differ). **Do not use `localhost` on the iPhone**: there it means the phone itself.
 
+### Set up Blender (expert, once)
+
+1. Package the add-on: `bash scripts/package-addon.sh`. This writes `build/roombridge-extension.zip`.
+2. In Blender: **Edit › Preferences › Get Extensions › ⌄ (top right) › Install from Disk…**, pick `build/roombridge-extension.zip`, and make sure **RoomBridge** is enabled. (Older Blender versions: use `build/roombridge-addon.zip` under **Preferences › Add-ons › Install from Disk**.)
+3. In the 3D Viewport press **N** and open the **RoomBridge** tab. After the phone creates a room you will paste the expert invite here.
+4. To update the add-on later: Disconnect, remove RoomBridge in Preferences, restart Blender, and install the new zip.
+
+The add-on works with Blender's **Allow Online Access** switched off, because it only talks to the server on your own network. Details, panels and troubleshooting: [docs/blender-setup.md](docs/blender-setup.md).
+
+### Set up the iPhone app (novice, once)
+
+1. `bash scripts/gen-ios.sh` generates `ios/RoomBridge.xcodeproj` (needs XcodeGen) and creates `ios/Config/Signing.xcconfig`.
+2. Put your Apple **Team ID** and a unique **bundle ID** in `ios/Config/Signing.xcconfig` (find the Team ID in Xcode › Settings › Accounts). The file is git-ignored, and regenerating the project keeps it.
+3. Open `ios/RoomBridge.xcodeproj`, pick your iPhone, press **Run**. If iOS says "Untrusted Developer": **Settings › General › VPN & Device Management › your Apple ID › Trust**.
+
+Full guide: [docs/ios-setup.md](docs/ios-setup.md).
+
+### Network tips
+
+- The phone and the Mac must be on the same network. If you switch networks, restart the server and use the new address it prints.
+- University and café Wi-Fi often block devices from reaching each other. Use the iPhone's **Personal Hotspot** and join it from the Mac instead.
+- On some carriers the hotspot is IPv6-only; the server then prints an address like `http://[2605:…]:8787`. Copy it exactly, brackets included.
+- Blender can always use `http://127.0.0.1:8787`, since it runs on the same Mac as the server.
+
+More fixes: [docs/troubleshooting.md](docs/troubleshooting.md).
+
 ### Start order
 
 1. **Server** on the Mac: `npm start` (above).
 2. **iPhone app:** enter `http://10.0.0.61:8787` and your name, tap **Create room (LiDAR scan)**. Allow camera and local network access when asked. See [docs/ios-setup.md](docs/ios-setup.md) to build and install the app.
 3. **Invite people** from the phone (**More › Invite people**):
-   - *Expert invite* → paste into the Blender add-on's **Invite** field and press **Connect** ([docs/blender-setup.md](docs/blender-setup.md)). This link grants editing rights; only send it to the designer.
-   - *Viewer link / QR code* → observers open it in a browser and enters their name.
+   - *Expert invite* → tap **Copy expert invite**, then paste it into the Blender add-on's **Invite** field and press **Connect**. Don't open it in a browser first: the page removes the secret part (`#t=…`) from the address bar. This link grants editing rights; only send it to the designer.
+   - *Observer link / QR code* → observers open it in a browser and enter their name.
 4. **Scan:** walk slowly around the area, then tap **Send room**. The expert sees the mesh appear in Blender in the `RoomBridge Room Scan (reference)` collection.
 5. **Preview (optional):** tap **Share preview** on the phone. It is off by default.
 6. **Design:** the expert adds objects from the RoomBridge sidebar's **Design Objects** library; they appear in AR on the phone and on the observers' plan view, and the phone narrates each edit as a CAD lesson (tap the toast or the graduation-cap button for the **Learn** sheet and the CAD skills checklist).
