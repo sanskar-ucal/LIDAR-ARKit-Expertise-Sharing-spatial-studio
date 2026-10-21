@@ -149,6 +149,6 @@ bash scripts/gen-ios.sh                             # generate ios/RoomBridge.xc
 - Voice notes are recorded only while the talk button is held, with a red recording indicator. The phone transcribes them on the device only (if on-device recognition is unavailable the note is sent without text); the browser does no speech recognition. Clips live in server memory, at most 40 per room, and are deleted with the room.
 - The server is meant for a trusted local network. It speaks plain HTTP/WS; put it behind a TLS reverse proxy before exposing it anywhere else.
 
-## AI usage
+## AI Usage
 
-This codebase was written with substantial help from an AI coding assistant (Cursor). The team specified the requirements, reviewed the design and code, and is responsible for it. Automated tests were run as listed in [docs/status.md](docs/status.md); anything that needs an iPhone, Xcode or Blender is marked there as awaiting manual verification rather than claimed to work.
+The team developed the concept, interaction design, and most of the implementation. We used Cursor’s AI agent (Claude models) for selected coding tasks, including test-case generation, code optimisation, and parts of the Blender integration. We also used AI to draft Markdown documentation in the `docs/` directory. We reviewed and revised its output and tested and debugged the system on a real iPhone and Mac with Blender. Prompts are included in the write-up, and outstanding manual checks are recorded in `docs/status.md`.
