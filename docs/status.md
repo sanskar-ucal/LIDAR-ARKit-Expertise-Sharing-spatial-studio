@@ -27,7 +27,7 @@ Later on 2026-10-17 expert prompts with "show me" ghost demos, push-to-talk voic
 | Server | Rate limits, auth timeout, credential redaction in logs | ✓ | ✓ (auth limits) | ✓ | ✓ |
 | Server | Object catalog kinds and round-kind validation | ✓ | ✓ | ✓ | ✓ |
 | Server | Novice proposals: propose, edit/withdraw own, accept (adjusted detection), reject with note, limits, permissions | ✓ | ✓ | ✓ | ✓ |
-| Server | Lessons: prompt/done/clear, demo validation, auto-complete on scan and on proposing the requested piece | ✓ | ✓ | | |
+| Server | Lessons: prompt/done/clear, demo validation, auto-complete on scan and on proposing the requested piece | ✓ | ✓ | ✓ | ✓ |
 | Server | Voice clips: upload (host/expert, audio types, 1 MiB), attach once to a comment, play for every role, in-memory limits | ✓ | ✓ | ✓ | ✓ |
 | Web | Join from link, token removed from address bar | ✓ | ✓ | ✓ desktop browser | ✓ |
 | Web | Live preview canvas, stale/paused/offline/synthetic badges | ✓ | ✓ (decode stubbed) | ✓ desktop browser, synthetic frames | real phone frames |
@@ -36,7 +36,7 @@ Later on 2026-10-17 expert prompts with "show me" ghost demos, push-to-talk voic
 | Web | Reconnect with resume | ✓ | ✓ | ✓ | ✓ |
 | Web | CAD lesson feed (shared narration rules, drag merging), proposal tags, catalog footprints | ✓ | ✓ | ✓ | ✓ |
 | Web | Prompt banner and feed entries, voice notes in chat (play, auto-play new), Observer role name | ✓ | ✓ (reducer; upload/download against the real server) | ✓ | ✓ |
-| Web | Expert push-to-talk (MediaRecorder, localhost secure-context link) | ✓ | | | real browser + microphone |
+| Web | Expert push-to-talk (MediaRecorder, localhost secure-context link) | ✓ | | ✓ | real browser + microphone |
 | Blender | Network thread, WebSocket client, session, reconnect, fatal auth | ✓ | ✓ (live server) | ✓ | ✓ |
 | Blender | Coordinate conversion, coalescing/echo suppression | ✓ | ✓ | ✓ | ✓ |
 | Blender | Scan download, decoding and mesh import | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
