@@ -46,21 +46,21 @@ Later on 2026-10-17 expert prompts with "show me" ghost demos, push-to-talk voic
 | Blender | Novice Proposals panel: outline, notice, adjust + accept with note, reject, decision log | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
 | Blender | Teach panel: scan/place/custom prompts and move/rotate/scale demos from the selected object; novice "done" notice | ✓ | ✓ (headless Blender 5.2.2 and unit tests) | ✓ | ✓ |
 | Blender | Voice notes listed in Discussion | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
-| Blender | Panel drawing and buttons in the GUI | ✓ | draw code only (stand-in layout, icon names checked) | | ✓ |
+| Blender | Panel drawing and buttons in the GUI | ✓ | draw code only (stand-in layout, icon names checked) | ✓ | ✓ |
 | iOS core | Protocol encode/decode, coordinates, guidance maths, tolerance gate, backoff, rate controller, binary formats, mesh simplifier | ✓ | ✓ | ✓ | ✓ |
 | iOS core | Catalog decoding, CAD narrator (shared fixture), drag-settle buffer, proposal messages | ✓ | ✓ | ✓ | ✓ |
-| iOS app | Furniture rendering from catalog parts, proposal styling, placement preview | ✓ | | | ✓ |
-| iOS app | Object library, crosshair placement on floor/wall, proposal editor, withdraw | ✓ | | | ✓ |
-| iOS app | Learning toasts, Learn sheet with CAD skills, approve/reject haptics | ✓ | narration rules only | | ✓ |
-| iOS core | Lesson and voice-note types, voice comment encoding (shared fixture) | ✓ | ✓ | | |
-| iOS app | Prompt card, scan-sweep animation, "Show me" ghost loop, Got it / Open library | ✓ | | | ✓ |
-| iOS app | Push-to-talk recording, on-device transcription, upload, auto-play of the expert's notes | ✓ | | | ✓ |
-| iOS app | Start screen, room creation, control/preview sockets | ✓ | | | ✓ |
-| iOS app | AR session, tracking states, rendering of objects, labels, markers | ✓ | | | ✓ |
-| iOS app | LiDAR mesh capture, simplification, chunked upload | ✓ | encoder/simplifier only | | ✓ |
-| iOS app | Preview broadcaster (snapshot, downscale, JPEG, adaptive rate) | ✓ | header format only | | ✓ |
-| iOS app | Hold-to-move, haptics, Done/Reset, sample-room nudges | ✓ | maths only | | ✓ |
-| iOS app | Invite sharing with QR, discussion, developer panel | ✓ | | | ✓ |
+| iOS app | Furniture rendering from catalog parts, proposal styling, placement preview | ✓ | | ✓ | ✓ |
+| iOS app | Object library, crosshair placement on floor/wall, proposal editor, withdraw | ✓ | | ✓ | ✓ |
+| iOS app | Learning toasts, Learn sheet with CAD skills, approve/reject haptics | ✓ | narration rules only | ✓ | ✓ |
+| iOS core | Lesson and voice-note types, voice comment encoding (shared fixture) | ✓ | ✓ | ✓ | ✓ |
+| iOS app | Prompt card, scan-sweep animation, "Show me" ghost loop, Got it / Open library | ✓ | | ✓ | ✓ |
+| iOS app | Push-to-talk recording, on-device transcription, upload, auto-play of the expert's notes | ✓ | | ✓ | ✓ |
+| iOS app | Start screen, room creation, control/preview sockets | ✓ | | ✓ | ✓ |
+| iOS app | AR session, tracking states, rendering of objects, labels, markers | ✓ | | ✓ | ✓ |
+| iOS app | LiDAR mesh capture, simplification, chunked upload | ✓ | encoder/simplifier only | ✓ | ✓ |
+| iOS app | Preview broadcaster (snapshot, downscale, JPEG, adaptive rate) | ✓ | header format only | ✓ | ✓ |
+| iOS app | Hold-to-move, haptics, Done/Reset, sample-room nudges | ✓ | maths only | ✓ | ✓ |
+| iOS app | Invite sharing with QR, discussion, developer panel | ✓ | | ✓ | ✓ |
 | Tooling | `dev.sh`, `package-addon.sh`, `gen-ios.sh`, synthetic frames | ✓ | | ✓ (dev.sh start/stop, zips built, gen-ios reports missing XcodeGen, synthetic stream) | `gen-ios.sh` with XcodeGen installed |
 
 Cross-component compatibility is checked with shared fixtures in `protocol/fixtures/`: `coordinates.json` and `messages.json` (TypeScript, Python, Swift), `narration.json` (Swift and TypeScript produce identical CAD captions), the object catalog `protocol/catalog.json` (read by all four components), and the binary `sample-room.rbsc` and `preview-frame.bin`, which the Swift encoder reproduces byte for byte and the server, web and Python decoders all read.
