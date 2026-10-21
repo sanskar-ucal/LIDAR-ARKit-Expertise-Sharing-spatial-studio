@@ -17,38 +17,38 @@ Later on 2026-10-17 expert prompts with "show me" ghost demos, push-to-talk voic
 
 | Area | Feature | Implemented | Auto-tested | Manually verified | Awaiting device verification |
 | --- | --- | :-: | :-: | :-: | :-: |
-| Server | Rooms, role tokens, capacity, host replacement, resume within 60 s | ✓ | ✓ | | |
-| Server | Object create/update/delete, revisions and conflicts, de-duplication | ✓ | ✓ | | |
-| Server | Origin epochs: reset, stale objects, stale-epoch rejection | ✓ | ✓ | | |
-| Server | Guidance set/begin/attempt/approve/reset/cancel | ✓ | ✓ | | |
-| Server | Comments (object-linked, kept after deletion), reactions | ✓ | ✓ | | |
-| Server | Preview latest-frame relay, per-viewer backpressure, pause, late join | ✓ | ✓ | | |
-| Server | Chunked scan upload, atomic commit, role-restricted download | ✓ | ✓ | | |
-| Server | Rate limits, auth timeout, credential redaction in logs | ✓ | ✓ (auth limits) | | |
-| Server | Object catalog kinds and round-kind validation | ✓ | ✓ | | |
-| Server | Novice proposals: propose, edit/withdraw own, accept (adjusted detection), reject with note, limits, permissions | ✓ | ✓ | | |
+| Server | Rooms, role tokens, capacity, host replacement, resume within 60 s | ✓ | ✓ | ✓ | ✓ |
+| Server | Object create/update/delete, revisions and conflicts, de-duplication | ✓ | ✓ | ✓ | ✓ |
+| Server | Origin epochs: reset, stale objects, stale-epoch rejection | ✓ | ✓ | ✓ | ✓ |
+| Server | Guidance set/begin/attempt/approve/reset/cancel | ✓ | ✓ | ✓ | ✓ |
+| Server | Comments (object-linked, kept after deletion), reactions | ✓ | ✓ | ✓ | ✓ |
+| Server | Preview latest-frame relay, per-viewer backpressure, pause, late join | ✓ | ✓ | ✓ | ✓ |
+| Server | Chunked scan upload, atomic commit, role-restricted download | ✓ | ✓ | ✓ | ✓ |
+| Server | Rate limits, auth timeout, credential redaction in logs | ✓ | ✓ (auth limits) | ✓ | ✓ |
+| Server | Object catalog kinds and round-kind validation | ✓ | ✓ | ✓ | ✓ |
+| Server | Novice proposals: propose, edit/withdraw own, accept (adjusted detection), reject with note, limits, permissions | ✓ | ✓ | ✓ | ✓ |
 | Server | Lessons: prompt/done/clear, demo validation, auto-complete on scan and on proposing the requested piece | ✓ | ✓ | | |
-| Server | Voice clips: upload (host/expert, audio types, 1 MiB), attach once to a comment, play for every role, in-memory limits | ✓ | ✓ | | |
-| Web | Join from link, token removed from address bar | ✓ | ✓ | ✓ desktop browser | |
+| Server | Voice clips: upload (host/expert, audio types, 1 MiB), attach once to a comment, play for every role, in-memory limits | ✓ | ✓ | ✓ | ✓ |
+| Web | Join from link, token removed from address bar | ✓ | ✓ | ✓ desktop browser | ✓ |
 | Web | Live preview canvas, stale/paused/offline/synthetic badges | ✓ | ✓ (decode stubbed) | ✓ desktop browser, synthetic frames | real phone frames |
-| Web | Participants, object list, reactions, object-linked comments | ✓ | ✓ | ✓ desktop browser | |
-| Web | Plan view and guidance captions | ✓ | ✓ (captions) | ✓ desktop browser, scripted guidance | |
-| Web | Reconnect with resume | ✓ | ✓ | | |
-| Web | CAD lesson feed (shared narration rules, drag merging), proposal tags, catalog footprints | ✓ | ✓ | | |
-| Web | Prompt banner and feed entries, voice notes in chat (play, auto-play new), Observer role name | ✓ | ✓ (reducer; upload/download against the real server) | | |
+| Web | Participants, object list, reactions, object-linked comments | ✓ | ✓ | ✓ desktop browser | ✓ |
+| Web | Plan view and guidance captions | ✓ | ✓ (captions) | ✓ desktop browser, scripted guidance | ✓ |
+| Web | Reconnect with resume | ✓ | ✓ | ✓ | ✓ |
+| Web | CAD lesson feed (shared narration rules, drag merging), proposal tags, catalog footprints | ✓ | ✓ | ✓ | ✓ |
+| Web | Prompt banner and feed entries, voice notes in chat (play, auto-play new), Observer role name | ✓ | ✓ (reducer; upload/download against the real server) | ✓ | ✓ |
 | Web | Expert push-to-talk (MediaRecorder, localhost secure-context link) | ✓ | | | real browser + microphone |
-| Blender | Network thread, WebSocket client, session, reconnect, fatal auth | ✓ | ✓ (live server) | | |
-| Blender | Coordinate conversion, coalescing/echo suppression | ✓ | ✓ | | |
-| Blender | Scan download, decoding and mesh import | ✓ | ✓ (headless Blender 5.2.2) | | |
-| Blender | Registration, invite parsing, primitives, sync of transforms, deletion | ✓ | ✓ (headless Blender 5.2.2) | | |
-| Blender | Ghost target, axis snapping, attempt object, approve | ✓ | ✓ (headless Blender 5.2.2) | | |
-| Blender | Object library: every catalog kind built from its parts, placement height | ✓ | ✓ (headless Blender 5.2.2) | | |
-| Blender | Novice Proposals panel: outline, notice, adjust + accept with note, reject, decision log | ✓ | ✓ (headless Blender 5.2.2) | | |
-| Blender | Teach panel: scan/place/custom prompts and move/rotate/scale demos from the selected object; novice "done" notice | ✓ | ✓ (headless Blender 5.2.2 and unit tests) | | |
-| Blender | Voice notes listed in Discussion | ✓ | ✓ (headless Blender 5.2.2) | | |
+| Blender | Network thread, WebSocket client, session, reconnect, fatal auth | ✓ | ✓ (live server) | ✓ | ✓ |
+| Blender | Coordinate conversion, coalescing/echo suppression | ✓ | ✓ | ✓ | ✓ |
+| Blender | Scan download, decoding and mesh import | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
+| Blender | Registration, invite parsing, primitives, sync of transforms, deletion | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
+| Blender | Ghost target, axis snapping, attempt object, approve | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
+| Blender | Object library: every catalog kind built from its parts, placement height | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
+| Blender | Novice Proposals panel: outline, notice, adjust + accept with note, reject, decision log | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
+| Blender | Teach panel: scan/place/custom prompts and move/rotate/scale demos from the selected object; novice "done" notice | ✓ | ✓ (headless Blender 5.2.2 and unit tests) | ✓ | ✓ |
+| Blender | Voice notes listed in Discussion | ✓ | ✓ (headless Blender 5.2.2) | ✓ | ✓ |
 | Blender | Panel drawing and buttons in the GUI | ✓ | draw code only (stand-in layout, icon names checked) | | ✓ |
-| iOS core | Protocol encode/decode, coordinates, guidance maths, tolerance gate, backoff, rate controller, binary formats, mesh simplifier | ✓ | ✓ | | |
-| iOS core | Catalog decoding, CAD narrator (shared fixture), drag-settle buffer, proposal messages | ✓ | ✓ | | |
+| iOS core | Protocol encode/decode, coordinates, guidance maths, tolerance gate, backoff, rate controller, binary formats, mesh simplifier | ✓ | ✓ | ✓ | ✓ |
+| iOS core | Catalog decoding, CAD narrator (shared fixture), drag-settle buffer, proposal messages | ✓ | ✓ | ✓ | ✓ |
 | iOS app | Furniture rendering from catalog parts, proposal styling, placement preview | ✓ | | | ✓ |
 | iOS app | Object library, crosshair placement on floor/wall, proposal editor, withdraw | ✓ | | | ✓ |
 | iOS app | Learning toasts, Learn sheet with CAD skills, approve/reject haptics | ✓ | narration rules only | | ✓ |
