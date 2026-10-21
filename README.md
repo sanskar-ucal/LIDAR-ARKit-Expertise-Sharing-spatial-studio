@@ -122,3 +122,7 @@ bash scripts/gen-ios.sh                             # generate ios/RoomBridge.xc
 - The preview is off until the phone user turns it on, and a red **LIVE** badge shows while it is on.
 - Voice notes are recorded only while the talk button is held, with a red recording indicator. The phone transcribes them on the device only (if on-device recognition is unavailable the note is sent without text); the browser does no speech recognition. Clips live in server memory, at most 40 per room, and are deleted with the room.
 - The server is meant for a trusted local network. It speaks plain HTTP/WS; put it behind a TLS reverse proxy before exposing it anywhere else.
+
+## AI usage
+
+This codebase was written with substantial help from an AI coding assistant (Cursor). The team specified the requirements, reviewed the design and code, and is responsible for it. Automated tests were run as listed in [docs/status.md](docs/status.md); anything that needs an iPhone, Xcode or Blender is marked there as awaiting manual verification rather than claimed to work.
